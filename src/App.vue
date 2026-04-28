@@ -31,7 +31,7 @@ const handleLogout = () => {
           <router-link to="/create" class="nav-link">创作</router-link>
           <router-link to="/groups" class="nav-link">群组</router-link>
           <router-link to="/mine" class="nav-link">
-            我的 ({{ userStore.userInfo.name }})
+            我的 ({{ userStore.userInfo.username }})
           </router-link>
         </template>
       </nav>
@@ -43,7 +43,7 @@ const handleLogout = () => {
           <router-link to="/register" class="btn-register">注册</router-link>
         </template>
         <template v-else>
-          <button @click="handleLogout" class="btn-logout">退出</button>
+          <button @click="handleLogout" class="btn-logout">退出登录</button>
         </template>
       </div>
     </div>

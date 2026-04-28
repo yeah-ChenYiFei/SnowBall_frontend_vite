@@ -1,109 +1,117 @@
-<!-- src/comments/CommentList.vue -->
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import http from '@/api/http'
 import { useUserStore } from '@/stores/user'
+import CommentItem from './CommentItem.vue' // ✅ 引入递归组件
 import type { Comment } from '@/types'
 
-const props = defineProps<{
-  postId: number
-}>()
-
+const props = defineProps<{ postId: number }>()
 const userStore = useUserStore()
-const comments = ref<Comment[]>([])
+const flatComments = ref<Comment[]>([])
 const newComment = ref('')
 const isLoading = ref(false)
 
-// 加载评论
+// ✅ 记录当前正在回复谁
+const replyTarget = ref<{ id: number | null, name: string }>({ id: null, name: '' })
+
+// ✅ 核心：将后端返回的扁平数组，转换成树形结构（支持无限层级）
+const commentTree = computed(() => {
+  const map: Record<number, any> = {}
+  const roots: any[] = []
+
+  // 1. 初始化所有节点
+  flatComments.value.forEach(c => {
+    map[c.id] = { ...c, children: [] }
+  })
+
+  // 2. 建立父子关系
+  flatComments.value.forEach(c => {
+    if (c.parentId && map[c.parentId]) {
+      map[c.parentId].children.push(map[c.id])
+    } else {
+      roots.push(map[c.id])
+    }
+  })
+
+  return roots
+})
+
 const loadComments = async () => {
   try {
-    // 假设后端返回的是树形结构，或者平铺结构我们在前端组装
-    // 这里假设后端平铺返回，前端根据 parentId 组装
     const res = await http.get(`/posts/${props.postId}/comments`)
-    const flatComments = res.data as Comment[]
-
-    // 组装成两级树
-    comments.value = flatComments
-      .filter(c => c.parentId === null)
-      .map(parent => ({
-        ...parent,
-        children: flatComments.filter(child => child.parentId === parent.id)
-      }))
+    flatComments.value = res.data || []
   } catch (error) {
     console.error('加载评论失败', error)
   }
 }
 
+// ✅ 接收子组件抛出的回复事件
+const handleSetReply = (commentId: number, authorName: string) => {
+  replyTarget.value = { id: commentId, name: authorName }
+  // 自动聚焦输入框（可选优化）
+}
+
 // 提交评论
-const submitComment = async (parentId: number | null = null) => {
+const submitComment = async () => {
   if (!newComment.value.trim()) return
-  if (!userStore.isLogin()) {
-    alert('请先登录再评论')
-    return
-  }
+  if (!userStore.isLogin()) return alert('请先登录')
 
   try {
     await http.post(`/posts/${props.postId}/comments`, {
-      body: newComment.value.trim(),
-      parentId: parentId
+      body: newComment.value.trim(), // ✅ 只发纯文本，不带 @
+      parentId: replyTarget.value.id // ✅ 如果是回复，把父 ID 传过去
     })
     newComment.value = ''
-    await loadComments() // 刷新列表
+    replyTarget.value = { id: null, name: '' } // 清空回复状态
+    await loadComments()
   } catch (error: any) {
     alert(error.message || '评论失败')
   }
 }
 
-onMounted(() => {
-  loadComments()
-})
+// 取消回复
+const cancelReply = () => {
+  replyTarget.value = { id: null, name: '' }
+  newComment.value = ''
+}
 
-// 暴露刷新方法给父组件
+onMounted(() => { loadComments() })
 defineExpose({ loadComments })
 </script>
 
 <template>
   <div class="comment-section">
-    <h3 class="comment-title">评论区 ({{ comments.length }})</h3>
+    <h3 class="comment-title">评论区 ({{ flatComments.length }})</h3>
 
-    <!-- 发表主评论 -->
+    <!-- 输入区 -->
     <div class="comment-form">
+      <!-- ✅ 显示回复提示条 -->
+      <div v-if="replyTarget.id" class="reply-hint">
+        <span>正在回复 @{{ replyTarget.name }}</span>
+        <button class="cancel-btn" @click="cancelReply">✕ 取消</button>
+      </div>
+
       <textarea
         v-model="newComment"
-        placeholder="写下你的想法..."
+        :placeholder="replyTarget.id ? `回复 @${replyTarget.name}...` : '写下你的想法...'"
         rows="3"
         class="comment-textarea"
       ></textarea>
-      <button class="btn-submit" @click="submitComment(null)" :disabled="isLoading">
+      <button class="btn-submit" @click="submitComment" :disabled="isLoading">
         发表评论
       </button>
     </div>
 
-    <!-- 评论列表 -->
+    <!-- 评论树列表 -->
     <div class="comment-list">
-      <div v-for="parent in comments" :key="parent.id" class="comment-item">
-        <div class="comment-main">
-          <div class="comment-header">
-            <span class="comment-author">{{ parent.authorName || '匿名用户' }}</span>
-            <span class="comment-time">{{ new Date(parent.createdAt).toLocaleString() }}</span>
-          </div>
-          <p class="comment-body">{{ parent.body }}</p>
-          <button class="btn-reply" @click="newComment = `@${parent.authorName} `">回复</button>
-        </div>
+      <CommentItem
+        v-for="comment in commentTree"
+        :key="comment.id"
+        :comment="comment"
+        @reply="handleSetReply"
+      />
 
-        <!-- 子评论（第二级） -->
-        <div v-if="parent.children && parent.children.length > 0" class="comment-children">
-          <div v-for="child in parent.children" :key="child.id" class="comment-child-item">
-            <div class="comment-header">
-              <span class="comment-author">{{ child.authorName || '匿名用户' }}</span>
-              <span class="comment-time">{{ new Date(child.createdAt).toLocaleString() }}</span>
-            </div>
-            <p class="comment-body">{{ child.body }}</p>
-          </div>
-        </div>
-      </div>
-
-      <div v-if="comments.length === 0" class="empty-comments">
+      <div v-if="flatComments.length === 0" class="empty-comments">
         暂无评论，快来说两句吧！
       </div>
     </div>
@@ -112,38 +120,48 @@ defineExpose({ loadComments })
 
 <style scoped>
 .comment-section { margin-top: 32px; }
-.comment-title { font-size: 18px; margin-bottom: 16px; color: #202124; }
+.comment-title { font-size: 18px; font-weight: 600; margin-bottom: 16px; color: #202124; }
 .comment-form {
-  background: #f8f9fa; padding: 16px; border-radius: 8px;
-  display: flex; flex-direction: column; gap: 12px; margin-bottom: 24px;
+  background: #f8f9fa;
+  padding: 16px;
+  border-radius: 8px;
+  margin-bottom: 24px;
+}
+/* ✅ 回复提示条样式 */
+.reply-hint {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #e8f0fe;
+  color: #1a73e8;
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-size: 13px;
+  margin-bottom: 12px;
+}
+.cancel-btn {
+  background: none; border: none; color: #1a73e8; cursor: pointer; font-size: 15px;
 }
 .comment-textarea {
-  border: 1px solid #dadce0; border-radius: 6px; padding: 12px;
-  font-size: 14px; resize: vertical; outline: none; font-family: inherit;
+  width: 100%;
+  border: 1px solid #dadce0;
+  border-radius: 6px;
+  padding: 12px;
+  font-size: 14px;
+  resize: vertical;
+  box-sizing: border-box;
+  margin-bottom: 12px;
 }
-.comment-textarea:focus { border-color: #1a73e8; }
 .btn-submit {
-  align-self: flex-end; padding: 8px 20px; background: #1a73e8;
-  color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px;
+  float: right;
+  padding: 8px 24px;
+  background: #1a73e8;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
 }
 .btn-submit:hover { background: #1557b0; }
-.btn-submit:disabled { background: #a8c7fa; cursor: not-allowed; }
-
-.comment-list { display: flex; flex-direction: column; gap: 16px; }
-.comment-item { border-bottom: 1px solid #e8eaed; padding-bottom: 16px; }
-.comment-main { }
-.comment-header { display: flex; gap: 12px; margin-bottom: 6px; align-items: center; }
-.comment-author { font-weight: 600; font-size: 14px; color: #202124; }
-.comment-time { font-size: 12px; color: #5f6368; }
-.comment-body { font-size: 14px; color: #333; line-height: 1.6; margin: 0 0 8px 0; }
-.btn-reply {
-  background: none; border: none; color: #1a73e8; font-size: 13px; cursor: pointer; padding: 0;
-}
-.comment-children {
-  margin-left: 40px; margin-top: 12px; background: #f8f9fa;
-  padding: 12px; border-radius: 8px; display: flex; flex-direction: column; gap: 12px;
-}
-.comment-child-item { border-bottom: 1px dashed #dadce0; padding-bottom: 8px; }
-.comment-child-item:last-child { border-bottom: none; padding-bottom: 0; }
-.empty-comments { text-align: center; color: #5f6368; padding: 20px; }
+.comment-list::after { content: ''; display: block; clear: both; }
+.empty-comments { text-align: center; color: #999; padding: 40px 0; }
 </style>
