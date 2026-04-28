@@ -1,19 +1,32 @@
 <!-- src/views/post/PostDetail.vue -->
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import http from '@/api/http' // ✅ 替换 fetch
-import CommentList from '@/comments/CommentList.vue' // ✅ 集成真实评论
+import http from '@/api/http'
+import { useUserStore } from '@/stores/user'
+import { ROLES } from '@/constants/role' // ✅ 引入角色常量
+import CommentList from '@/comments/CommentList.vue'
 import type { Post } from '@/types'
 
 const route = useRoute()
 const router = useRouter()
+const userStore = useUserStore()
 const post = ref<Post | null>(null)
 const isLoading = ref(true)
 
 const typeMap: Record<string, string> = {
   OC: '原创角色', SETTING: '世界观', FRAGMENT: '小说片段', BOOK_INFO: '书籍信息'
 }
+
+// 计算属性：判断当前登录用户是不是这篇帖子的作者
+const isAuthor = computed(() => {
+  return post.value && userStore.userInfo?.id === post.value.userId
+})
+
+// ✅ 规范化：使用常量判断，替代 'SYS_ADMIN' 魔法字符串
+const isAdmin = computed(() => {
+  return userStore.userInfo?.role === ROLES.SYS_ADMIN
+})
 
 const loadPost = async () => {
   try {
@@ -25,22 +38,32 @@ const loadPost = async () => {
     isLoading.value = false
   }
 }
-// 删除帖子
-const handleDelete = async () => {
-  if (!confirm('确定要彻底删除这篇帖子吗？此操作不可逆！')) return
 
+// 普通用户：删除自己的帖子
+const handleDelete = async () => {
+  if (!confirm('确定要删除这篇帖子吗？')) return
   try {
     await http.delete(`/posts/${route.params.id}`)
     alert('删除成功')
-    router.push('/') // 删除后回首页
+    router.push('/')
   } catch (error: any) {
     alert('删除失败：' + (error.message || '权限不足'))
   }
 }
 
-onMounted(() => {
-  loadPost()
-})
+// 管理员强删帖子
+const handleAdminDelete = async () => {
+  if (!confirm('⚠️ 警告：此操作为管理员强删，数据将不可恢复！')) return
+  try {
+    await http.delete(`/posts/admin/${route.params.id}`)
+    alert('强删成功')
+    router.push('/')
+  } catch (error: any) {
+    alert('操作失败：' + (error.message || '无权限'))
+  }
+}
+
+onMounted(() => { loadPost() })
 </script>
 
 <template>
@@ -60,7 +83,6 @@ onMounted(() => {
 
         <h1 class="post-title">{{ post.title }}</h1>
 
-        <!-- 标签展示 -->
         <div v-if="post.tags && post.tags.length > 0" class="post-tags">
           <span v-for="tag in post.tags" :key="tag" class="tag-pill">#{{ tag }}</span>
         </div>
@@ -69,16 +91,23 @@ onMounted(() => {
           <p v-for="(line, index) in post.body.split('\n')" :key="index">{{ line }}</p>
         </div>
 
-        <!-- 操作区预留 -->
+        <!-- 核心改造：根据身份动态显示操作按钮 -->
         <div class="action-bar">
-          <button class="action-btn" @click="router.push(`/post/${post.id}/edit`)">✏️ 编辑内容</button>
-          <button class="action-btn" @click="router.push(`/post/${post.id}/versions`)">📜 版本历史</button>
-          <!-- ✅ 新增删除按钮 -->
-          <button class="action-btn btn-danger" @click="handleDelete">🗑️ 删除帖子</button>
+          <!-- 情况1：是作者本人，显示常规操作 -->
+          <template v-if="isAuthor">
+            <button class="action-btn" @click="router.push(`/post/${post.id}/edit`)">✏️ 编辑内容</button>
+            <button class="action-btn" @click="router.push(`/post/${post.id}/versions`)">📜 版本历史</button>
+            <button class="action-btn btn-danger" @click="handleDelete">🗑️ 删除帖子</button>
+          </template>
+
+          <!-- 情况2：不是作者，但是管理员，显示强删按钮 -->
+          <template v-else-if="isAdmin">
+            <button class="action-btn btn-admin-danger" @click="handleAdminDelete">🛡️ 管理员强删</button>
+          </template>
         </div>
       </article>
 
-      <!-- ✅ 真实评论区挂载 -->
+      <!-- 真实评论区挂载 -->
       <CommentList :post-id="post.id" />
     </div>
 
@@ -118,4 +147,16 @@ onMounted(() => {
 .action-btn:hover { background: #f8f9fa; border-color: #d2e3fc; color: #1a73e8; }
 .action-btn.btn-danger { color: #d93025; border-color: #f28b82; }
 .action-btn.btn-danger:hover { background: #fce8e6; color: #c5221f; border-color: #f28b82; }
+
+/* 管理员强删按钮样式：深红色醒目 */
+.action-btn.btn-admin-danger {
+  color: #fff;
+  background: #d93025;
+  border-color: #d93025;
+  font-weight: 600;
+}
+.action-btn.btn-admin-danger:hover {
+  background: #c5221f;
+  border-color: #c5221f;
+}
 </style>

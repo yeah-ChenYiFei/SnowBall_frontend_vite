@@ -2,37 +2,26 @@
 import { ref, onMounted, computed } from 'vue'
 import http from '@/api/http'
 import { useUserStore } from '@/stores/user'
-import CommentItem from './CommentItem.vue' // ✅ 引入递归组件
+import CommentItem from './CommentItem.vue'
 import type { Comment } from '@/types'
 
 const props = defineProps<{ postId: number }>()
 const userStore = useUserStore()
 const flatComments = ref<Comment[]>([])
-const newComment = ref('')
+const newComment = ref('') // 现在只用于发表一级主评论
 const isLoading = ref(false)
 
-// ✅ 记录当前正在回复谁
-const replyTarget = ref<{ id: number | null, name: string }>({ id: null, name: '' })
+// ✅ 核心状态：记录当前展开的小输入框是属于哪条评论的
+const activeReplyId = ref<number | null>(null)
 
-// ✅ 核心：将后端返回的扁平数组，转换成树形结构（支持无限层级）
 const commentTree = computed(() => {
   const map: Record<number, any> = {}
   const roots: any[] = []
-
-  // 1. 初始化所有节点
+  flatComments.value.forEach(c => { map[c.id] = { ...c, children: [] } })
   flatComments.value.forEach(c => {
-    map[c.id] = { ...c, children: [] }
+    if (c.parentId && map[c.parentId]) { map[c.parentId].children.push(map[c.id]) }
+    else { roots.push(map[c.id]) }
   })
-
-  // 2. 建立父子关系
-  flatComments.value.forEach(c => {
-    if (c.parentId && map[c.parentId]) {
-      map[c.parentId].children.push(map[c.id])
-    } else {
-      roots.push(map[c.id])
-    }
-  })
-
   return roots
 })
 
@@ -40,39 +29,38 @@ const loadComments = async () => {
   try {
     const res = await http.get(`/posts/${props.postId}/comments`)
     flatComments.value = res.data || []
-  } catch (error) {
-    console.error('加载评论失败', error)
-  }
+  } catch (error) { console.error('加载评论失败', error) }
 }
 
-// ✅ 接收子组件抛出的回复事件
-const handleSetReply = (commentId: number, authorName: string) => {
-  replyTarget.value = { id: commentId, name: authorName }
-  // 自动聚焦输入框（可选优化）
-}
-
-// 提交评论
-const submitComment = async () => {
+// ✅ 提交一级主评论
+const submitMainComment = async () => {
   if (!newComment.value.trim()) return
   if (!userStore.isLogin()) return alert('请先登录')
-
   try {
     await http.post(`/posts/${props.postId}/comments`, {
-      body: newComment.value.trim(), // ✅ 只发纯文本，不带 @
-      parentId: replyTarget.value.id // ✅ 如果是回复，把父 ID 传过去
+      body: newComment.value.trim(),
+      parentId: null // 一级评论没有 parentId
     })
     newComment.value = ''
-    replyTarget.value = { id: null, name: '' } // 清空回复状态
     await loadComments()
-  } catch (error: any) {
-    alert(error.message || '评论失败')
-  }
+  } catch (error: any) { alert(error.message || '评论失败') }
 }
 
-// 取消回复
-const cancelReply = () => {
-  replyTarget.value = { id: null, name: '' }
-  newComment.value = ''
+// ✅ 接收子组件的打开/关闭事件
+const handleOpenReply = (id: number | null) => {
+  activeReplyId.value = id
+}
+
+// ✅ 接收子组件提交的回复
+const handleSubmitReply = async (parentId: number, body: string) => {
+  try {
+    await http.post(`/posts/${props.postId}/comments`, {
+      body: body,
+      parentId: parentId
+    })
+    activeReplyId.value = null // 提交成功后收起小输入框
+    await loadComments()      // 刷新列表
+  } catch (error: any) { alert(error.message || '回复失败') }
 }
 
 onMounted(() => { loadComments() })
@@ -83,21 +71,15 @@ defineExpose({ loadComments })
   <div class="comment-section">
     <h3 class="comment-title">评论区 ({{ flatComments.length }})</h3>
 
-    <!-- 输入区 -->
+    <!-- 顶部输入区：现在专门用于发表一级主评论 -->
     <div class="comment-form">
-      <!-- ✅ 显示回复提示条 -->
-      <div v-if="replyTarget.id" class="reply-hint">
-        <span>正在回复 @{{ replyTarget.name }}</span>
-        <button class="cancel-btn" @click="cancelReply">✕ 取消</button>
-      </div>
-
       <textarea
         v-model="newComment"
-        :placeholder="replyTarget.id ? `回复 @${replyTarget.name}...` : '写下你的想法...'"
+        placeholder="写下你的想法..."
         rows="3"
         class="comment-textarea"
       ></textarea>
-      <button class="btn-submit" @click="submitComment" :disabled="isLoading">
+      <button class="btn-submit" @click="submitMainComment" :disabled="isLoading">
         发表评论
       </button>
     </div>
@@ -108,7 +90,9 @@ defineExpose({ loadComments })
         v-for="comment in commentTree"
         :key="comment.id"
         :comment="comment"
-        @reply="handleSetReply"
+        :active-reply-id="activeReplyId"
+        @open-reply="handleOpenReply"
+        @submit-reply="handleSubmitReply"
       />
 
       <div v-if="flatComments.length === 0" class="empty-comments">
@@ -117,6 +101,7 @@ defineExpose({ loadComments })
     </div>
   </div>
 </template>
+
 
 <style scoped>
 .comment-section { margin-top: 32px; }

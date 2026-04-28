@@ -1,8 +1,9 @@
 // src/router/index.ts
 import { createRouter, createWebHistory } from 'vue-router'
 import { useUserStore } from '@/stores/user'
+import { ROLES } from '@/constants/role' // ✅ 引入常量
 
-// 按需引入所有页面组件
+// 按需引入所有页面组件 (保持你原来的不变)
 import Home from '@/views/Home.vue'
 import Create from '@/views/Create.vue'
 import Explore from '@/views/Explore.vue'
@@ -21,38 +22,48 @@ const router = createRouter({
   history: createWebHistory(),
   routes: [
     { path: '/', component: Home },
-    { path: '/create', component: Create },
+    { path: '/create', component: Create, meta: { requiresAuth: true } }, // ✅ 优化写法
     { path: '/explore', component: Explore },
     { path: '/about', component: About },
-
-    // ✅ 核心：将编辑和历史改为平级路由，不再作为 children
     { path: '/post/:id', component: PostDetail },
-    { path: '/post/:id/edit', component: PostEdit },
-    { path: '/post/:id/versions', component: VersionHistory },
-
+    { path: '/post/:id/edit', component: PostEdit, meta: { requiresAuth: true } },
+    { path: '/post/:id/versions', component: VersionHistory, meta: { requiresAuth: true } },
     { path: '/chain/:id', component: ChainDetail },
-
     { path: '/login', component: Login },
     { path: '/register', component: Register },
+    { path: '/mine', component: Mine, meta: { requiresAuth: true } },
+    { path: '/groups', component: Groups, meta: { requiresAuth: true } },
+    { path: '/books', component: BookManage, meta: { requiresAuth: true } },
 
-    { path: '/mine', component: Mine },
-    { path: '/groups', component: Groups },
-    { path: '/books', component: BookManage },
+    // ✅ 示例：未来如果你加了后台管理页面，就这样配
+    // { path: '/admin', component: () => import('@/views/admin/Dashboard.vue'), meta: { requiresAuth: true, requiredRoles: [ROLES.SYS_ADMIN] } }
   ]
 })
 
 // 全局前置守卫
-router.beforeEach((to, from) => {
+router.beforeEach(async (to, from) => {
   const userStore = useUserStore()
 
-  // 需要登录才能访问的路径白名单
-  const needLogin = ['/create', '/mine', '/books', '/groups']
+  // ✅ 必须等待用户信息加载完，否则刷新页面时 userInfo 是空的
+  await userStore.waitReady()
 
-  if (needLogin.includes(to.path) && !userStore.isLogin()) {
-    return '/login' // 重定向到登录
+  // 1. 基础登录拦截
+  if (to.meta.requiresAuth && !userStore.isLogin()) {
+    return '/login'
   }
 
-  return true // 放行
+  // 2. ✅ 基于角色的路由拦截（读取 meta.requiredRoles）
+  if (to.meta.requiredRoles) {
+    const requiredRoles = to.meta.requiredRoles as string[]
+    const currentRole = userStore.userInfo?.role
+
+    if (!currentRole || !requiredRoles.includes(currentRole)) {
+      alert('无权访问该页面')
+      return '/' // 没权限踢回首页
+    }
+  }
+
+  return true
 })
 
 export default router

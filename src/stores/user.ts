@@ -1,14 +1,19 @@
 ﻿// src/stores/user.ts
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { ref, computed } from 'vue' // ✅ 引入 computed
 import http from '@/api/http'
+import { ROLES } from '@/constants/role' // ✅ 引入常量
 
 export const useUserStore = defineStore('user', () => {
   const token = ref(localStorage.getItem('token') || '')
   const userInfo = ref<any>({ name: '', username: '' })
 
-  // ✅ 用于存储初始化时的异步请求 Promise
   let initPromise: Promise<void> | null = null
+
+  // ✅ 核心新增：权限计算属性（全局唯一真相来源）
+  const isAdmin = computed(() => userInfo.value?.role === ROLES.SYS_ADMIN)
+  const isGroupAdmin = computed(() => userInfo.value?.role === ROLES.GROUP_ADMIN)
+  const isAnyAdmin = computed(() => isAdmin.value || isGroupAdmin.value)
 
   const login = async (username: string, password: string) => {
     const res = await http.post('/auth/login', { username, password })
@@ -35,21 +40,15 @@ export const useUserStore = defineStore('user', () => {
 
   const isLogin = () => !!token.value
 
-  // ✅ 刷新页面时，如果有 token 就自动拉取信息，并把 Promise 存起来
   if (token.value && !userInfo.value.id) {
     initPromise = fetchUserInfo()
   }
 
-  // ✅ 暴露给组件调用的方法：如果有正在进行的初始化，就等它完成
   const waitReady = () => initPromise || Promise.resolve()
 
   return {
-    token,
-    userInfo,
-    login,
-    logout,
-    isLogin,
-    fetchUserInfo,
-    waitReady  // ✅ 导出它
+    token, userInfo, login, logout, isLogin, fetchUserInfo, waitReady,
+    // ✅ 导出权限状态
+    isAdmin, isGroupAdmin, isAnyAdmin
   }
 })
