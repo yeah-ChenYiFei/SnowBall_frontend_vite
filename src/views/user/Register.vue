@@ -32,16 +32,13 @@ const handleRegister = async () => {
 
   loading.value = true
   try {
-    // 对应后端 AuthController 的 /auth/register
     await http.post('/auth/register', {
       username: username.value,
       password: password.value
     })
-    // 注册成功，跳转到登录页
     alert('🎉 注册成功！请登录')
     router.push('/login')
   } catch (error: any) {
-    // 捕获后端抛出的 400 "用户名已被注册" 等异常
     errMsg.value = error.message || '注册失败，请稍后再试'
   } finally {
     loading.value = false
@@ -58,21 +55,24 @@ const handleRegister = async () => {
         <p class="login-subtitle">开启你的故事共创之旅</p>
       </div>
 
-      <!-- 错误提示 -->
       <div v-if="errMsg" class="error-alert">{{ errMsg }}</div>
 
       <form @submit.prevent="handleRegister" class="login-form">
         <div class="form-group">
-          <label>用户名</label>
-          <input v-model="username" type="text" placeholder="至少3个字符" />
+          <!-- ✅ 补全 for 属性 -->
+          <label for="reg-username">用户名</label>
+          <!-- ✅ 注册场景：使用 username -->
+          <input id="reg-username" v-model="username" type="text" autocomplete="username" placeholder="至少3个字符" />
         </div>
         <div class="form-group">
-          <label>密码</label>
-          <input v-model="password" type="password" placeholder="至少6个字符" />
+          <label for="reg-password">密码</label>
+          <!-- ✅ 注册场景：使用 new-password -->
+          <input id="reg-password" v-model="password" type="password" autocomplete="new-password" placeholder="至少6个字符" />
         </div>
         <div class="form-group">
-          <label>确认密码</label>
-          <input v-model="confirmPassword" type="password" placeholder="请再次输入密码" />
+          <label for="reg-confirm">确认密码</label>
+          <!-- ✅ 注册场景：再次输入新密码也用 new-password -->
+          <input id="reg-confirm" v-model="confirmPassword" type="password" autocomplete="new-password" placeholder="请再次输入密码" />
         </div>
         <button type="submit" class="login-btn" :disabled="loading">
           {{ loading ? '注册中...' : '立即注册' }}
@@ -80,25 +80,15 @@ const handleRegister = async () => {
       </form>
 
       <div class="login-footer">
-        <router-link to="/login" class="register-link">
-          已有账号？返回登录
-        </router-link>
+        <router-link to="/login" class="register-link">已有账号？返回登录</router-link>
       </div>
     </div>
   </div>
 </template>
 
 <style scoped>
-/* 复用 Login 页面的极简微蓝样式 */
-.login-container {
-  display: flex; justify-content: center; align-items: center;
-  min-height: calc(100vh - 64px);
-  background: linear-gradient(135deg, #e8f0fe 0%, #f8f9fa 100%);
-}
-.login-card {
-  background: white; border-radius: 12px; padding: 48px 40px;
-  width: 100%; max-width: 420px; box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
-}
+.login-container { display: flex; justify-content: center; align-items: center; min-height: calc(100vh - 64px); background: linear-gradient(135deg, #e8f0fe 0%, #f8f9fa 100%); }
+.login-card { background: white; border-radius: 12px; padding: 48px 40px; width: 100%; max-width: 420px; box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08); }
 .login-header { text-align: center; margin-bottom: 32px; }
 .login-icon { font-size: 48px; display: block; margin-bottom: 16px; }
 .login-title { font-size: 24px; font-weight: 600; color: #202124; margin: 0 0 8px 0; }
@@ -106,24 +96,13 @@ const handleRegister = async () => {
 .login-form { display: flex; flex-direction: column; gap: 20px; }
 .form-group { display: flex; flex-direction: column; gap: 6px; }
 .form-group label { font-size: 14px; font-weight: 500; color: #202124; }
-.form-group input {
-  padding: 12px 16px; border: 1px solid #dadce0; border-radius: 8px;
-  font-size: 15px; outline: none; transition: all 0.2s ease;
-}
+.form-group input { padding: 12px 16px; border: 1px solid #dadce0; border-radius: 8px; font-size: 15px; outline: none; transition: all 0.2s ease; }
 .form-group input:focus { border-color: #1a73e8; box-shadow: 0 0 0 3px rgba(26, 115, 232, 0.1); }
-.login-btn {
-  padding: 12px; background: #1a73e8; color: white; border: none;
-  border-radius: 8px; font-size: 16px; font-weight: 500; cursor: pointer; margin-top: 8px;
-}
+.login-btn { padding: 12px; background: #1a73e8; color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: 500; cursor: pointer; margin-top: 8px; }
 .login-btn:hover:not(:disabled) { background: #1557b0; }
 .login-btn:disabled { background: #a8c7fa; cursor: not-allowed; }
 .login-footer { text-align: center; margin-top: 24px; padding-top: 24px; border-top: 1px solid #e8eaed; }
 .register-link { color: #1a73e8; text-decoration: none; font-size: 14px; }
 .register-link:hover { text-decoration: underline; }
-
-/* 错误提示样式 */
-.error-alert {
-  background: #fce8e6; color: #d93025; padding: 12px; border-radius: 6px;
-  font-size: 14px; margin-bottom: 20px; border: 1px solid #f28b82;
-}
+.error-alert { background: #fce8e6; color: #d93025; padding: 12px; border-radius: 6px; font-size: 14px; margin-bottom: 20px; border: 1px solid #f28b82; }
 </style>

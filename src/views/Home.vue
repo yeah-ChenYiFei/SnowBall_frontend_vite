@@ -46,6 +46,40 @@ const typeMap: Record<string, string> = {
 onMounted(() => {
   loadPosts()
 })
+// 赞/踩操作
+const handleReact = async (post: Post, type: 'LIKE' | 'DISLIKE') => {
+  try {
+    await http.post(`/posts/${post.id}/react`, null, { params: { reactionType: type } })
+    // 乐观更新 UI（不重新请求列表，体验更丝滑）
+    if (post.currentUserReaction === type) {
+      // 第二次点相同 → 取消
+      post.currentUserReaction = null
+      if (type === 'LIKE') post.likeCount = (post.likeCount || 0) - 1
+      else post.dislikeCount = (post.dislikeCount || 0) - 1
+    } else {
+      // 如果之前有相反的评价，先减掉
+      if (post.currentUserReaction === 'LIKE') post.likeCount = (post.likeCount || 0) - 1
+      if (post.currentUserReaction === 'DISLIKE') post.dislikeCount = (post.dislikeCount || 0) - 1
+      // 设置新状态
+      post.currentUserReaction = type
+      if (type === 'LIKE') post.likeCount = (post.likeCount || 0) + 1
+      else post.dislikeCount = (post.dislikeCount || 0) + 1
+    }
+    // 重新排序（因为推荐分变了）
+    posts.value.sort((a, b) => calcScore(b) - calcScore(a))
+  } catch (error) {
+    console.error('评价失败', error)
+  }
+}
+
+// 前端也维护一份简易热度分数用于排序
+const calcScore = (post: Post) => {
+  const net = (post.likeCount || 0) - (post.dislikeCount || 0)
+  if (net <= 0) return 0
+  const hours = (Date.now() - new Date(post.createdAt).getTime()) / 3600000 + 2
+  return net / Math.pow(hours, 1.5)
+}
+
 </script>
 
 <template>
@@ -86,7 +120,23 @@ onMounted(() => {
         <p class="card-body">{{ post.body?.substring(0, 100) }}...</p>
         <div class="card-footer">
           <span class="author">👤 {{ post.authorName || '匿名' }}</span>
-          <span class="stats">💬 {{ post.commentCount || 0 }}</span>
+          <div class="reaction-bar">
+            <button
+              class="react-btn like-btn"
+              :class="{ active: post.currentUserReaction === 'LIKE' }"
+              @click.prevent="handleReact(post, 'LIKE')"
+            >
+              👍 {{ post.likeCount || 0 }}
+            </button>
+            <button
+              class="react-btn dislike-btn"
+              :class="{ active: post.currentUserReaction === 'DISLIKE' }"
+              @click.prevent="handleReact(post, 'DISLIKE')"
+            >
+              👎 {{ post.dislikeCount || 0 }}
+            </button>
+            <span class="stats">💬 {{ post.commentCount || 0 }}</span>
+          </div>
         </div>
         <!-- 标签展示 -->
         <div v-if="post.tags && post.tags.length > 0" class="card-tags">
@@ -163,4 +213,23 @@ onMounted(() => {
 .card-footer { display: flex; gap: 16px; font-size: 13px; color: #999; }
 .card-tags { margin-top: 10px; display: flex; gap: 6px; flex-wrap: wrap; }
 .mini-tag { font-size: 12px; color: #1a73e8; }
+.reaction-bar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.react-btn {
+  background: none;
+  border: 1px solid #e8eaed;
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 13px;
+  cursor: pointer;
+  color: #5f6368;
+  transition: all 0.2s;
+}
+.react-btn:hover { background: #f1f3f4; }
+.like-btn.active { background: #e6f4ea; color: #137333; border-color: #ceead6; }
+.dislike-btn.active { background: #fce8e6; color: #c5221f; border-color: #f28b82; }
+
 </style>

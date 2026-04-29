@@ -32,6 +32,9 @@ export interface Post {
   // 以下为联表查询时的扩展字段（后端 VO 会提供）
   authorName?: string
   commentCount?: number
+  likeCount?: number
+  dislikeCount?: number
+  currentUserReaction?: 'LIKE' | 'DISLIKE' | null
 }
 
 // 4. 评论模块（支持两级嵌套）
