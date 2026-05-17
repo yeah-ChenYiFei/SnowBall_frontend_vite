@@ -111,3 +111,55 @@ export interface UserVO {
   avatarUrl?: string
 }
 
+// 7. 世界观 / 设定
+export interface World {
+  id: number
+  userId: number
+  name: string
+  description: string
+  type: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface WorldEntry {
+  id: number
+  worldId: number
+  userId: number
+  name: string
+  type: string
+  content: string
+  contentPreview: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface WorldRelation {
+  id: number
+  worldId: number
+  fromEntryId: number
+  fromEntryName: string
+  toEntryId: number
+  toEntryName: string
+  direction: 'LEFT_ARROW' | 'RIGHT_ARROW' | 'BIDIRECTIONAL'
+  description: string
+  createdAt: string
+}
+
+// 图谱节点
+export interface GraphNode {
+  id: number
+  name: string
+  x: number
+  y: number
+}
+
+// 图谱连线
+export interface GraphEdge {
+  id: number
+  fromId: number
+  toId: number
+  direction: string
+  description: string
+}
+

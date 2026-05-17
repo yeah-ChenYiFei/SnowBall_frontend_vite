@@ -6,6 +6,11 @@ import { ROLES } from '@/constants/role' // ✅ 引入常量
 // 按需引入所有页面组件 (保持你原来的不变)
 import Home from '@/views/Home.vue'
 import Create from '@/views/Create.vue'
+import SettingWriting from '@/views/create/SettingWriting.vue'
+import InspirationNote from '@/views/create/InspirationNote.vue'
+import ArticleWriting from '@/views/create/ArticleWriting.vue'
+import WorldDetail from '@/views/create/WorldDetail.vue'
+import EntryDetail from '@/views/create/EntryDetail.vue'
 import Explore from '@/views/Explore.vue'
 import About from '@/views/About.vue'
 import PostDetail from '@/views/post/PostDetail.vue'
@@ -22,7 +27,12 @@ const router = createRouter({
   history: createWebHistory(),
   routes: [
     { path: '/', component: Home },
-    { path: '/create', component: Create, meta: { requiresAuth: true } }, // ✅ 优化写法
+    { path: '/create', component: Create, meta: { requiresAuth: true } },
+    { path: '/create/setting', component: SettingWriting },
+    { path: '/create/setting/:worldId', component: WorldDetail },
+    { path: '/create/setting/:worldId/entry/:entryId', component: EntryDetail },
+    { path: '/create/inspiration', component: InspirationNote },
+    { path: '/create/article', component: ArticleWriting },
     { path: '/explore', component: Explore },
     { path: '/about', component: About },
     { path: '/post/:id', component: PostDetail },

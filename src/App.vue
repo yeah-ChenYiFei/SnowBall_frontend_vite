@@ -1,11 +1,30 @@
 <script setup lang="ts">
+import { ref } from 'vue'
 import { useUserStore } from './stores/user'
 import { useRouter } from 'vue-router'
 
 const userStore = useUserStore()
 const router = useRouter()
 
-const handleLogout = () => {
+const showCreateMenu = ref(false)
+let hideTimer: ReturnType<typeof setTimeout> | null = null
+
+const createSubItems = [
+  { label: '设定编写', path: '/create/setting', desc: '世界观与角色设定' },
+  { label: '灵感记录', path: '/create/inspiration', desc: '捕捉创作灵感' },
+  { label: '文章写作', path: '/create/article', desc: '发布原创作品' },
+]
+
+function openCreateMenu() {
+  if (hideTimer) { clearTimeout(hideTimer); hideTimer = null }
+  showCreateMenu.value = true
+}
+
+function scheduleHide() {
+  hideTimer = setTimeout(() => { showCreateMenu.value = false }, 150)
+}
+
+function handleLogout() {
   userStore.logout()
   router.push('/login')
 }
@@ -28,7 +47,32 @@ const handleLogout = () => {
         <router-link to="/explore" class="nav-link">发现</router-link>
 
         <template v-if="userStore.isLogin()">
-          <router-link to="/create" class="nav-link">创作</router-link>
+          <div
+            class="nav-dropdown"
+            @mouseenter="openCreateMenu"
+            @mouseleave="scheduleHide"
+          >
+            <span class="nav-link nav-link-dropdown" :class="{ 'is-active': showCreateMenu }">
+              创作
+              <span class="arrow" :class="{ 'arrow-open': showCreateMenu }">▾</span>
+            </span>
+            <transition name="dropdown">
+              <div v-if="showCreateMenu" class="dropdown-panel"
+                   @mouseenter="openCreateMenu"
+                   @mouseleave="scheduleHide">
+                <router-link
+                  v-for="item in createSubItems"
+                  :key="item.path"
+                  :to="item.path"
+                  class="dropdown-item"
+                  @click="showCreateMenu = false"
+                >
+                  <span class="item-label">{{ item.label }}</span>
+                  <span class="item-desc">{{ item.desc }}</span>
+                </router-link>
+              </div>
+            </transition>
+          </div>
           <router-link to="/groups" class="nav-link">群组</router-link>
           <router-link to="/mine" class="nav-link">
             我的 ({{ userStore.userInfo.username }})
@@ -182,5 +226,81 @@ const handleLogout = () => {
   padding: 32px 24px;
   min-height: calc(100vh - 64px);
   background: #f8f9fa;
+}
+
+/* 下拉菜单 */
+.nav-dropdown {
+  position: relative;
+}
+
+.nav-link-dropdown {
+  cursor: default;
+  user-select: none;
+}
+
+.arrow {
+  display: inline-block;
+  font-size: 11px;
+  margin-left: 4px;
+  transition: transform 0.25s ease;
+  vertical-align: 1px;
+}
+
+.arrow-open {
+  transform: rotate(180deg);
+}
+
+.dropdown-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  min-width: 180px;
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.10), 0 2px 6px rgba(0, 0, 0, 0.06);
+  border: 1px solid #e8f0fe;
+  padding: 6px 0;
+  z-index: 1001;
+  transform-origin: top center;
+}
+
+.dropdown-item {
+  display: flex;
+  flex-direction: column;
+  padding: 10px 18px;
+  text-decoration: none;
+  transition: background 0.15s ease;
+}
+
+.dropdown-item:hover {
+  background: #e8f0fe;
+}
+
+.item-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #202124;
+}
+
+.item-desc {
+  font-size: 12px;
+  color: #5f6368;
+  margin-top: 2px;
+}
+
+/* Vue transition: dropdown */
+.dropdown-enter-active {
+  transition: opacity 0.2s ease, transform 0.25s ease;
+}
+.dropdown-leave-active {
+  transition: opacity 0.15s ease, transform 0.2s ease;
+}
+.dropdown-enter-from {
+  opacity: 0;
+  transform: translateY(-8px) scaleY(0.96);
+}
+.dropdown-leave-to {
+  opacity: 0;
+  transform: translateY(-4px) scaleY(0.97);
 }
 </style>
