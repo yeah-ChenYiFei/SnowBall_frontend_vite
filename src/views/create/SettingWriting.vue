@@ -15,6 +15,7 @@ const form = ref({
   name: '',
   description: '',
   type: '',
+  isPublic: true,
 })
 
 const typeOptions = ['奇幻', '科幻', '都市', '古风', '末世', '架空历史', '其他']
@@ -29,7 +30,7 @@ async function loadWorlds() {
 }
 
 function openModal() {
-  form.value = { name: '', description: '', type: '' }
+  form.value = { name: '', description: '', type: '', isPublic: true }
   showModal.value = true
 }
 
@@ -77,7 +78,10 @@ onMounted(loadWorlds)
         class="world-card"
         @click="router.push(`/create/setting/${w.id}`)"
       >
-        <div class="card-name">{{ w.name }}</div>
+        <div class="card-name">
+          {{ w.name }}
+          <span v-if="!w.isPublic" class="private-badge">🔒 私有</span>
+        </div>
         <div class="card-meta">
           <span v-if="w.type" class="card-type">{{ w.type }}</span>
         </div>
@@ -120,6 +124,15 @@ onMounted(loadWorlds)
               rows="3"
               placeholder="简单描述这个世界的背景..."
             ></textarea>
+          </div>
+
+          <div class="form-row form-row-inline">
+            <label class="form-label">公开可见</label>
+            <label class="toggle-switch">
+              <input v-model="form.isPublic" type="checkbox" />
+              <span class="toggle-slider"></span>
+              <span class="toggle-text">{{ form.isPublic ? '所有人可见' : '仅自己可见' }}</span>
+            </label>
           </div>
 
           <div class="modal-actions">
@@ -207,6 +220,18 @@ onMounted(loadWorlds)
   font-weight: 600;
   color: #202124;
   margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.private-badge {
+  font-size: 11px;
+  font-weight: 500;
+  color: #5f6368;
+  background: #f1f3f4;
+  padding: 2px 8px;
+  border-radius: 10px;
 }
 
 .card-meta {
@@ -299,6 +324,57 @@ onMounted(loadWorlds)
 
 .form-textarea {
   resize: vertical;
+}
+
+.form-row-inline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.toggle-switch {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.toggle-switch input {
+  display: none;
+}
+
+.toggle-slider {
+  width: 40px;
+  height: 22px;
+  background: #dadce0;
+  border-radius: 11px;
+  position: relative;
+  transition: background 0.2s;
+}
+
+.toggle-slider::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  background: #fff;
+  border-radius: 50%;
+  transition: transform 0.2s;
+}
+
+.toggle-switch input:checked + .toggle-slider {
+  background: #1a73e8;
+}
+
+.toggle-switch input:checked + .toggle-slider::after {
+  transform: translateX(18px);
+}
+
+.toggle-text {
+  font-size: 13px;
+  color: #5f6368;
 }
 
 .modal-actions {

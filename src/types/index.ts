@@ -72,11 +72,11 @@ export interface ChainSegment {
   id: number
   chainId: number
   userId: number
+  username?: string
   body: string
   prevSegmentId: number | null
   depth: number
   createdAt: string
-  authorName?: string
 }
 
 // 图书实体（为下半场准备）
@@ -118,6 +118,7 @@ export interface World {
   name: string
   description: string
   type: string
+  isPublic: boolean
   createdAt: string
   updatedAt: string
 }

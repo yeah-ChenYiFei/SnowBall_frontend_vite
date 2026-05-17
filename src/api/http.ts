@@ -35,17 +35,16 @@ http.interceptors.response.use(
     return res as any
   },
   error => {
-    // ✅ 新增：处理网络断开/后端重启等情况（此时 error.response 为空）
+    // 处理从成功拦截器 reject 出来的业务错误（有 code 但无 response）
+    if ((error as any).code && !error.response) {
+      return Promise.reject(error)
+    }
+
+    // 处理网络断开/后端重启等情况（此时 error.response 为空）
     if (!error.response) {
       console.warn('网络连接异常，可能后端正在重启...')
-      const userStore = useUserStore()
-      userStore.logout() // 清理本地脏数据
-
-      // 如果当前不在登录页，自动跳转过去
-      if (router.currentRoute.value.path !== '/login') {
-        router.push('/login')
-      }
-      return Promise.reject(new Error('网络连接异常，可能后端正在重启...'))
+      // 网络不通时不强制登出，等后端恢复即可
+      return Promise.reject(new Error('网络连接异常，请稍后重试'))
     }
 
     // 原有逻辑：处理有响应体但状态码不对的情况
@@ -57,7 +56,8 @@ http.interceptors.response.use(
     }
 
     if (error.response.status === 403) {
-      return Promise.reject(new Error('没有权限执行此操作'))
+      const msg = error.response.data?.message || '没有权限执行此操作'
+      return Promise.reject(new Error(msg))
     }
 
     return Promise.reject(error)

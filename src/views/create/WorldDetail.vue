@@ -2,10 +2,12 @@
 import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import http from '@/api/http'
+import { useUserStore } from '@/stores/user'
 import type { World, WorldEntry, WorldRelation, Result } from '@/types'
 
 const route = useRoute()
 const router = useRouter()
+const userStore = useUserStore()
 const worldId = Number(route.params.worldId)
 
 const DEFAULT_TYPES = ['人物', '地理', '历史', '物品', '生物', '规则', '故事点', '其他']
@@ -17,6 +19,35 @@ const customTypes = ref<string[]>([])
 const selectedType = ref('')
 const searchKeyword = ref('')
 const message = ref('')
+
+// ---- 编辑世界 ----
+const isWorldCreator = computed(() => world.value?.userId === userStore.userInfo?.id)
+const showEditWorldModal = ref(false)
+const editWorldForm = ref({ name: '', description: '', type: '', isPublic: true })
+const editWorldMsg = ref('')
+const editWorldSaving = ref(false)
+
+function openEditWorld() {
+  if (!world.value) return
+  editWorldForm.value = {
+    name: world.value.name,
+    description: world.value.description,
+    type: world.value.type,
+    isPublic: world.value.isPublic,
+  }
+  editWorldMsg.value = ''
+  showEditWorldModal.value = true
+}
+
+async function handleSaveWorld() {
+  if (!editWorldForm.value.name.trim()) { editWorldMsg.value = '名称不能为空'; return }
+  editWorldSaving.value = true; editWorldMsg.value = ''
+  try {
+    const res = await http.put(`/worlds/${worldId}`, editWorldForm.value) as unknown as Result<World>
+    if (res.code === 200) { world.value = res.data; showEditWorldModal.value = false }
+  } catch (e: any) { editWorldMsg.value = e.message || '保存失败' }
+  finally { editWorldSaving.value = false }
+}
 
 // ---- 设定弹窗 ----
 const showEntryModal = ref(false)
@@ -164,6 +195,14 @@ async function handleCreateEntry() {
   finally { isSubmitting.value = false }
 }
 
+async function deleteEntry(entryId: number, entryName: string) {
+  if (!confirm(`确定要删除设定「${entryName}」吗？此操作不可撤销。`)) return
+  try {
+    const res = await http.delete(`/worlds/${worldId}/entries/${entryId}`) as unknown as Result
+    if (res.code === 200) { loadEntries(); loadTypes(); loadRelations() }
+  } catch (e: any) { message.value = e.message || '删除失败' }
+}
+
 // ---- 关系 ----
 async function loadRelations() {
   try {
@@ -224,6 +263,22 @@ async function handleCreateRelation() {
       loadRelations()
     }
   } catch (e: any) { createMsg.value = e.message || '创建失败' }
+}
+
+async function deleteRelation(relationId: number) {
+  if (!confirm('确定要删除这条关系吗？')) return
+  try {
+    const res = await http.delete(`/worlds/${worldId}/relations/${relationId}`) as unknown as Result
+    if (res.code === 200) loadRelations()
+  } catch (e: any) { message.value = e.message || '删除失败' }
+}
+
+async function deleteWorld_confirm() {
+  if (!confirm(`确定要删除世界「${world.value?.name}」及其所有设定和关系吗？此操作不可撤销。`)) return
+  try {
+    const res = await http.delete(`/worlds/${worldId}`) as unknown as Result
+    if (res.code === 200) router.push('/create/setting')
+  } catch (e: any) { message.value = e.message || '删除失败' }
 }
 
 const directionLabel: Record<string, string> = {
@@ -312,13 +367,45 @@ onMounted(() => {
     <div class="wd-header">
       <button class="back-btn" @click="router.push('/create/setting')">← 返回</button>
       <div class="wd-info">
-        <h1 class="wd-name">{{ world?.name || '加载中...' }}</h1>
+        <h1 class="wd-name">
+          {{ world?.name || '加载中...' }}
+          <span v-if="world && !world.isPublic" class="private-badge">🔒 私有</span>
+        </h1>
         <div class="wd-meta">
           <span v-if="world?.type" class="wd-type-tag">{{ world.type }}</span>
           <span class="wd-desc">{{ world?.description || '暂无简介' }}</span>
+          <button v-if="isWorldCreator" class="btn-edit-world" @click="openEditWorld">⚙️ 编辑世界</button>
+          <button v-if="isWorldCreator" class="btn-delete-world" @click="deleteWorld_confirm">🗑 删除世界</button>
         </div>
       </div>
     </div>
+
+    <!-- 编辑世界弹窗 -->
+    <transition name="modal">
+      <div v-if="showEditWorldModal" class="modal-overlay" @click.self="showEditWorldModal = false">
+        <div class="modal-box">
+          <h2 class="modal-title">编辑世界</h2>
+          <div v-if="editWorldMsg" class="modal-error">{{ editWorldMsg }}</div>
+          <div class="form-row"><label class="form-label">名称</label><input v-model="editWorldForm.name" type="text" class="form-input" /></div>
+          <div class="form-row"><label class="form-label">类型</label><input v-model="editWorldForm.type" type="text" class="form-input" placeholder="如：奇幻、科幻..." /></div>
+          <div class="form-row"><label class="form-label">简介</label><textarea v-model="editWorldForm.description" class="form-input form-textarea" rows="3"></textarea></div>
+          <div class="form-row form-row-inline">
+            <label class="form-label">公开可见</label>
+            <label class="toggle-switch">
+              <input v-model="editWorldForm.isPublic" type="checkbox" />
+              <span class="toggle-slider"></span>
+              <span class="toggle-text">{{ editWorldForm.isPublic ? '所有人可见' : '仅自己可见' }}</span>
+            </label>
+          </div>
+          <div class="modal-actions">
+            <button class="btn-cancel" @click="showEditWorldModal = false">取消</button>
+            <button class="btn-create" @click="handleSaveWorld" :disabled="editWorldSaving">
+              {{ editWorldSaving ? '保存中...' : '保存' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </transition>
 
     <!-- 双栏 -->
     <div class="wd-columns">
@@ -343,6 +430,7 @@ onMounted(() => {
             <div class="entry-head">
               <span class="entry-name">{{ e.name }}</span>
               <span v-if="e.type" class="entry-type-tag">{{ e.type }}</span>
+              <button v-if="isWorldCreator" class="btn-delete-sm" @click.stop="deleteEntry(e.id, e.name)" title="删除此设定">✕</button>
             </div>
             <div class="entry-preview">{{ e.contentPreview || e.content }}</div>
           </div>
@@ -482,6 +570,7 @@ onMounted(() => {
                 <span class="rel-arrow">{{ directionLabel[r.direction] }}</span>
                 <span class="rel-entry-name">{{ r.toEntryName }}</span>
                 <span class="rel-desc-text">{{ r.description }}</span>
+                <button v-if="isWorldCreator" class="btn-delete-sm" @click="deleteRelation(r.id)" title="删除此关系">✕</button>
               </div>
             </div>
             <div class="rel-actions">
@@ -637,10 +726,13 @@ onMounted(() => {
           </transition>
 
           <div class="rel-actions">
-            <button class="btn-cancel" @click="showEditRelModal = false">取消</button>
-            <button class="btn-primary" @click="handleSaveRelation" :disabled="editRelSaving">
-              {{ editRelSaving ? '保存中...' : '保存' }}
-            </button>
+            <button v-if="isWorldCreator" class="btn-delete" @click="deleteRelation(editingRelation!.id); showEditRelModal = false">删除关系</button>
+            <div class="rel-actions-right">
+              <button class="btn-cancel" @click="showEditRelModal = false">取消</button>
+              <button class="btn-primary" @click="handleSaveRelation" :disabled="editRelSaving">
+                {{ editRelSaving ? '保存中...' : '保存' }}
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -659,6 +751,37 @@ onMounted(() => {
 .wd-meta { display: flex; align-items: center; gap: 10px; }
 .wd-type-tag { font-size: 12px; background: rgba(26,115,232,0.1); color: #1a73e8; padding: 2px 10px; border-radius: 20px; }
 .wd-desc { font-size: 14px; color: #5f6368; }
+.btn-edit-world {
+  margin-left: auto; padding: 6px 14px; border: 1px solid #dadce0; background: #fff;
+  color: #5f6368; border-radius: 6px; font-size: 13px; cursor: pointer; transition: all 0.15s;
+  white-space: nowrap;
+}
+.btn-edit-world:hover { border-color: #1a73e8; color: #1a73e8; }
+.btn-delete-world {
+  padding: 6px 14px; border: 1px solid #f5c6cb; background: #fff;
+  color: #d93025; border-radius: 6px; font-size: 13px; cursor: pointer; transition: all 0.15s;
+  white-space: nowrap;
+}
+.btn-delete-world:hover { background: #fce8e6; border-color: #d93025; }
+.btn-delete-sm {
+  margin-left: auto; background: none; border: none; color: #9aa0a6; font-size: 14px; cursor: pointer;
+  padding: 2px 6px; border-radius: 4px; flex-shrink: 0;
+}
+.btn-delete-sm:hover { color: #d93025; background: #fce8e6; }
+.btn-delete {
+  padding: 10px 24px; border: 1px solid #f5c6cb; background: #fff;
+  color: #d93025; border-radius: 8px; font-size: 14px; cursor: pointer; transition: all 0.15s;
+}
+.btn-delete:hover { background: #fce8e6; }
+.private-badge { font-size: 12px; font-weight: 400; color: #5f6368; background: #f1f3f4; padding: 2px 10px; border-radius: 10px; margin-left: 8px; }
+.form-row-inline { display: flex; align-items: center; justify-content: space-between; }
+.toggle-switch { display: flex; align-items: center; gap: 10px; cursor: pointer; }
+.toggle-switch input { display: none; }
+.toggle-slider { width: 40px; height: 22px; background: #dadce0; border-radius: 11px; position: relative; transition: background 0.2s; flex-shrink: 0; }
+.toggle-slider::after { content: ''; position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; background: #fff; border-radius: 50%; transition: transform 0.2s; }
+.toggle-switch input:checked + .toggle-slider { background: #1a73e8; }
+.toggle-switch input:checked + .toggle-slider::after { transform: translateX(18px); }
+.toggle-text { font-size: 13px; color: #5f6368; }
 
 /* 双栏 */
 .wd-columns { display: grid; grid-template-columns: 1fr 480px; gap: 24px; align-items: start; }
@@ -794,7 +917,8 @@ onMounted(() => {
 .rel-entry-name { font-size: 14px; font-weight: 500; color: #202124; }
 .rel-arrow { font-size: 20px; color: #1a73e8; font-weight: 600; }
 .rel-desc-text { font-size: 12px; color: #5f6368; margin-left: auto; }
-.rel-actions { display: flex; justify-content: flex-end; gap: 12px; margin-top: 20px; }
+.rel-actions { display: flex; justify-content: space-between; gap: 12px; margin-top: 20px; }
+.rel-actions-right { display: flex; gap: 12px; }
 
 /* 关系创建 */
 .rel-create-body { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; margin-bottom: 20px; }
