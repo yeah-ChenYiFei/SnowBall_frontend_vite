@@ -369,7 +369,7 @@ onMounted(() => {
       <div class="wd-info">
         <h1 class="wd-name">
           {{ world?.name || '加载中...' }}
-          <span v-if="world && !world.isPublic" class="private-badge">🔒 私有</span>
+<!--          <span v-if="world && !world.isPublic" class="private-badge">🔒 私有</span>-->
         </h1>
         <div class="wd-meta">
           <span v-if="world?.type" class="wd-type-tag">{{ world.type }}</span>
@@ -389,14 +389,14 @@ onMounted(() => {
           <div class="form-row"><label class="form-label">名称</label><input v-model="editWorldForm.name" type="text" class="form-input" /></div>
           <div class="form-row"><label class="form-label">类型</label><input v-model="editWorldForm.type" type="text" class="form-input" placeholder="如：奇幻、科幻..." /></div>
           <div class="form-row"><label class="form-label">简介</label><textarea v-model="editWorldForm.description" class="form-input form-textarea" rows="3"></textarea></div>
-          <div class="form-row form-row-inline">
-            <label class="form-label">公开可见</label>
-            <label class="toggle-switch">
-              <input v-model="editWorldForm.isPublic" type="checkbox" />
-              <span class="toggle-slider"></span>
-              <span class="toggle-text">{{ editWorldForm.isPublic ? '所有人可见' : '仅自己可见' }}</span>
-            </label>
-          </div>
+<!--          <div class="form-row form-row-inline">-->
+<!--            <label class="form-label">公开可见</label>-->
+<!--            <label class="toggle-switch">-->
+<!--              <input v-model="editWorldForm.isPublic" type="checkbox" />-->
+<!--              <span class="toggle-slider"></span>-->
+<!--              <span class="toggle-text">{{ editWorldForm.isPublic ? '所有人可见' : '仅自己可见' }}</span>-->
+<!--            </label>-->
+<!--          </div>-->
           <div class="modal-actions">
             <button class="btn-cancel" @click="showEditWorldModal = false">取消</button>
             <button class="btn-create" @click="handleSaveWorld" :disabled="editWorldSaving">

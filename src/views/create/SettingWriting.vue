@@ -30,7 +30,7 @@ async function loadWorlds() {
 }
 
 function openModal() {
-  form.value = { name: '', description: '', type: '', isPublic: true }
+  form.value = { name: '', description: '', type: '', isPublic: false }
   showModal.value = true
 }
 
@@ -80,7 +80,7 @@ onMounted(loadWorlds)
       >
         <div class="card-name">
           {{ w.name }}
-          <span v-if="!w.isPublic" class="private-badge">🔒 私有</span>
+<!--          <span v-if="!w.isPublic" class="private-badge">🔒 私有</span>-->
         </div>
         <div class="card-meta">
           <span v-if="w.type" class="card-type">{{ w.type }}</span>
@@ -125,15 +125,15 @@ onMounted(loadWorlds)
               placeholder="简单描述这个世界的背景..."
             ></textarea>
           </div>
-
-          <div class="form-row form-row-inline">
-            <label class="form-label">公开可见</label>
-            <label class="toggle-switch">
-              <input v-model="form.isPublic" type="checkbox" />
-              <span class="toggle-slider"></span>
-              <span class="toggle-text">{{ form.isPublic ? '所有人可见' : '仅自己可见' }}</span>
-            </label>
-          </div>
+<!--创建时是否公开可见-->
+<!--          <div class="form-row form-row-inline">-->
+<!--            <label class="form-label">公开可见</label>-->
+<!--            <label class="toggle-switch">-->
+<!--              <input v-model="form.isPublic" type="checkbox" />-->
+<!--              <span class="toggle-slider"></span>-->
+<!--              <span class="toggle-text">{{ form.isPublic ? '所有人可见' : '仅自己可见' }}</span>-->
+<!--            </label>-->
+<!--          </div>-->
 
           <div class="modal-actions">
             <button class="btn-cancel" @click="closeModal" :disabled="isSubmitting">取消</button>
