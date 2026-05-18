@@ -16,7 +16,7 @@ const isSubmitting = ref(false)
 
 // ---- edit modal ----
 const showEditModal = ref(false)
-const editingId = ref('')
+const editingId = ref<number>(0)
 const editingContent = ref('')
 
 // ---- timeline ----
@@ -103,7 +103,7 @@ async function submitInspiration() {
   const content = newContent.value.trim()
   if (!content) return
   isSubmitting.value = true
-  store.add(content)
+  await store.add(content)
   isSubmitting.value = false
   closeCreateModal()
 }
@@ -116,20 +116,20 @@ function openEditModal(item: Inspiration) {
 
 function closeEditModal() {
   showEditModal.value = false
-  editingId.value = ''
+  editingId.value = 0
   editingContent.value = ''
 }
 
-function saveEdit() {
+async function saveEdit() {
   const content = editingContent.value.trim()
   if (!content || !editingId.value) return
-  store.update(editingId.value, content)
+  await store.update(editingId.value, content)
   closeEditModal()
 }
 
-function deleteInspiration() {
+async function deleteInspiration() {
   if (!editingId.value) return
-  store.remove(editingId.value)
+  await store.remove(editingId.value)
   closeEditModal()
 }
 </script>

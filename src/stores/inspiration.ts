@@ -1,51 +1,40 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import http from '@/api/http'
 import type { Inspiration } from '@/types'
-
-const STORAGE_KEY = 'snowball_inspirations'
 
 export const useInspirationStore = defineStore('inspiration', () => {
   const inspirations = ref<Inspiration[]>([])
+  const loading = ref(false)
 
-  function load() {
+  async function load() {
+    loading.value = true
     try {
-      const raw = localStorage.getItem(STORAGE_KEY)
-      if (raw) inspirations.value = JSON.parse(raw)
-    } catch { /* corrupted data, ignore */ }
-  }
-
-  function persist() {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(inspirations.value))
-  }
-
-  function add(content: string): Inspiration {
-    const now = new Date().toISOString()
-    const insp: Inspiration = {
-      id: Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
-      content,
-      createdAt: now,
-      updatedAt: now,
-    }
-    inspirations.value.unshift(insp)
-    persist()
-    return insp
-  }
-
-  function update(id: string, content: string) {
-    const item = inspirations.value.find((i) => i.id === id)
-    if (item) {
-      item.content = content
-      item.updatedAt = new Date().toISOString()
-      persist()
+      const res = await http.get<Inspiration[]>('/inspirations')
+      inspirations.value = res.data
+    } finally {
+      loading.value = false
     }
   }
 
-  function remove(id: string) {
+  async function add(content: string): Promise<Inspiration> {
+    const res = await http.post<Inspiration>('/inspirations', { content })
+    inspirations.value.unshift(res.data)
+    return res.data
+  }
+
+  async function update(id: number, content: string) {
+    const res = await http.put<Inspiration>(`/inspirations/${id}`, { content })
+    const idx = inspirations.value.findIndex((i) => i.id === id)
+    if (idx !== -1) inspirations.value[idx] = res.data
+  }
+
+  async function remove(id: number) {
+    await http.delete(`/inspirations/${id}`)
     inspirations.value = inspirations.value.filter((i) => i.id !== id)
-    persist()
   }
 
   load()
 
-  return { inspirations, load, add, update, remove }
+  return { inspirations, loading, load, add, update, remove }
 })

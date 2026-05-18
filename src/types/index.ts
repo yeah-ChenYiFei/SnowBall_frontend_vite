@@ -166,7 +166,8 @@ export interface GraphEdge {
 
 // 灵感记录
 export interface Inspiration {
-  id: string
+  id: number
+  userId: number
   content: string
   createdAt: string
   updatedAt: string
