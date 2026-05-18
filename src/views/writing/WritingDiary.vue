@@ -48,7 +48,7 @@ function formatWeekday(dateStr: string) {
 async function loadArticles() {
   isLoading.value = true
   try {
-    const res = await http.get('/posts')
+    const res = await http.get('/articles', { params: { type: 'DIARY' } })
     articles.value = (res.data || []) as Article[]
   } catch {
     // silent

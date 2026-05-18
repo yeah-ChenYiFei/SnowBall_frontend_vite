@@ -90,7 +90,7 @@ function resetAutoRotate() {
 async function loadArticles() {
   isLoading.value = true
   try {
-    const res = await http.get('/posts')
+    const res = await http.get('/articles')
     articles.value = (res.data || []) as Article[]
   } catch {
     // silent fail, show empty state

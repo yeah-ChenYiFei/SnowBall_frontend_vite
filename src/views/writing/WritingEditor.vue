@@ -169,7 +169,7 @@ async function loadArticle() {
   if (!editId.value) return
   isLoading.value = true
   try {
-    const res = await http.get(`/posts/${editId.value}`)
+    const res = await http.get(`/articles/${editId.value}`)
     const data = res.data
     articleType.value = data.type as ArticleType
     title.value = data.title
@@ -229,14 +229,14 @@ async function handleSave() {
 
   try {
     if (isEditMode.value) {
-      await http.put(`/posts/${editId.value}`, {
+      await http.put(`/articles/${editId.value}`, {
         title: title.value,
         body: content.value,
         chapter: showChapter.value ? chapter.value : undefined,
         changeSummary: '编辑文章',
       })
     } else {
-      await http.post('/posts', {
+      await http.post('/articles', {
         type: articleType.value,
         title: title.value,
         body: content.value,
@@ -256,7 +256,7 @@ async function handleSave() {
 async function loadNovelChapters(bookName: string) {
   isLoading.value = true
   try {
-    const res = await http.get('/search', { params: { q: bookName } })
+    const res = await http.get('/articles', { params: { search: bookName, type: 'NOVEL' } })
     const allPosts = (res.data || []) as any[]
 
     novelChapters.value = []
@@ -301,13 +301,13 @@ async function createNovelBook() {
   isSubmitting.value = true
   message.value = ''
   try {
-    const res = await http.post('/posts', {
+    const res = await http.post('/articles', {
       type: 'NOVEL',
       title: title.value.trim(),
       body: '',
       chapter: encodeNovelConfig({ hasVolumes: novelHasVolumes.value }),
     })
-    novelConfigId.value = (res as any).id
+    novelConfigId.value = res.data.id
     novelPhase.value = 'write'
     sectionType.value = 'main'
     currentVolume.value = 1
@@ -339,14 +339,14 @@ async function saveNovelChapter() {
 
     const existingId = existingChapterPostId.value
     if (existingId) {
-      await http.put(`/posts/${existingId}`, {
+      await http.put(`/articles/${existingId}`, {
         title: title.value,
         body: content.value,
         chapter: encoded,
         changeSummary: `编辑${SectionTypeLabel[sectionType.value]}章节`,
       })
     } else {
-      await http.post('/posts', {
+      await http.post('/articles', {
         type: 'NOVEL',
         title: title.value,
         body: content.value,
