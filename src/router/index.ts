@@ -21,6 +21,7 @@ import Login from '@/views/user/Login.vue'
 import Register from '@/views/user/Register.vue'
 import Mine from '@/views/user/Mine.vue'
 import Groups from '@/views/user/Groups.vue'
+import GroupDetail from '@/views/group/GroupDetail.vue'
 import BookManage from '@/views/user/BookManage.vue'
 import WritingCenter from '@/views/writing/WritingCenter.vue'
 import WritingEditor from '@/views/writing/WritingEditor.vue'
@@ -47,6 +48,7 @@ const router = createRouter({
     { path: '/register', component: Register },
     { path: '/mine', component: Mine, meta: { requiresAuth: true } },
     { path: '/groups', component: Groups, meta: { requiresAuth: true } },
+    { path: '/groups/:groupId', component: GroupDetail, meta: { requiresAuth: true } },
     { path: '/books', component: BookManage, meta: { requiresAuth: true } },
     { path: '/writing', component: WritingCenter },
     { path: '/writing/new', component: WritingEditor },

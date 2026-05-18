@@ -98,6 +98,75 @@ export interface Group {
   creatorName?: string
   memberCount?: number
 }
+
+// ===== 群组扩展类型 =====
+
+export interface GroupDetail {
+  id: number
+  name: string
+  description: string
+  creatorId: number
+  creatorName: string
+  isPrivate: boolean
+  memberCount: number
+  members: GroupMemberInfo[]
+  createdAt: string
+}
+
+export interface GroupMemberInfo {
+  userId: number
+  username: string
+  role: string // 'admin' | 'member'
+}
+
+export interface GroupMessage {
+  id: number
+  groupId: number
+  senderId: number
+  senderName: string
+  body: string
+  type: string // 'CHAT' | 'CHAIN_START' | 'CHAIN_SEGMENT' | 'BATTLE_START' | 'BATTLE_ENTRY' | 'SYSTEM'
+  refId?: number
+  refType?: string // 'CHAIN' | 'BATTLE'
+  createdAt: string
+}
+
+export interface WritingBattle {
+  id: number
+  groupId: number
+  creatorId: number
+  creatorName: string
+  topic: string
+  description: string
+  deadline: string
+  status: string // 'OPEN' | 'VOTING' | 'CLOSED'
+  entries?: BattleEntry[]
+  createdAt: string
+}
+
+export interface BattleEntry {
+  id: number
+  battleId: number
+  userId: number
+  username: string
+  title: string
+  body: string
+  avgScore: number
+  voteCount: number
+  reviews?: BattleReview[]
+  createdAt: string
+}
+
+export interface BattleReview {
+  id: number
+  entryId: number
+  reviewerId: number
+  reviewerName: string
+  score: number
+  comment: string
+  createdAt: string
+}
+
 // --- 个人主页聚合 VO（对应后端 UserProfileVO） ---
 export interface UserProfileVO {
   user: UserVO
