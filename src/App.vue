@@ -12,7 +12,7 @@ let hideTimer: ReturnType<typeof setTimeout> | null = null
 const createSubItems = [
   { label: '设定编写', path: '/create/setting', desc: '世界观与角色设定' },
   { label: '灵感记录', path: '/create/inspiration', desc: '捕捉创作灵感' },
-  { label: '文章写作', path: '/create/article', desc: '发布原创作品' },
+  { label: '创作中心', path: '/writing', desc: '写作工作台' },
 ]
 
 function openCreateMenu() {

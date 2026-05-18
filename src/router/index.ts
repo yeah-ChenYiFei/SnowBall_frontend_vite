@@ -22,6 +22,10 @@ import Register from '@/views/user/Register.vue'
 import Mine from '@/views/user/Mine.vue'
 import Groups from '@/views/user/Groups.vue'
 import BookManage from '@/views/user/BookManage.vue'
+import WritingCenter from '@/views/writing/WritingCenter.vue'
+import WritingEditor from '@/views/writing/WritingEditor.vue'
+import WritingLibrary from '@/views/writing/WritingLibrary.vue'
+import WritingDiary from '@/views/writing/WritingDiary.vue'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -44,6 +48,11 @@ const router = createRouter({
     { path: '/mine', component: Mine, meta: { requiresAuth: true } },
     { path: '/groups', component: Groups, meta: { requiresAuth: true } },
     { path: '/books', component: BookManage, meta: { requiresAuth: true } },
+    { path: '/writing', component: WritingCenter },
+    { path: '/writing/new', component: WritingEditor },
+    { path: '/writing/library', component: WritingLibrary },
+    { path: '/writing/diary', component: WritingDiary },
+    { path: '/writing/:id', component: WritingEditor },
 
     // ✅ 示例：未来如果你加了后台管理页面，就这样配
     // { path: '/admin', component: () => import('@/views/admin/Dashboard.vue'), meta: { requiresAuth: true, requiredRoles: [ROLES.SYS_ADMIN] } }

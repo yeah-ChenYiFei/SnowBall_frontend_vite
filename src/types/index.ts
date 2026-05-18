@@ -173,3 +173,27 @@ export interface Inspiration {
   updatedAt: string
 }
 
+// ===== 写作中心相关类型 =====
+export type ArticleType = 'ESSAY' | 'DIARY' | 'NOVEL'
+
+export const ArticleTypeLabel: Record<ArticleType, string> = {
+  ESSAY: '散文',
+  DIARY: '日记',
+  NOVEL: '小说',
+}
+
+export interface Article {
+  id: number
+  userId: number
+  type: ArticleType
+  title: string
+  body: string
+  status?: string
+  version?: number
+  chapter?: string
+  wordCount?: number
+  createdAt: string
+  updatedAt?: string
+  authorName?: string
+}
+
