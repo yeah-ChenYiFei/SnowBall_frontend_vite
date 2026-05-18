@@ -164,3 +164,11 @@ export interface GraphEdge {
   description: string
 }
 
+// 灵感记录
+export interface Inspiration {
+  id: string
+  content: string
+  createdAt: string
+  updatedAt: string
+}
+
