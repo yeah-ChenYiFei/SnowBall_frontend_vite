@@ -44,10 +44,12 @@ export interface Comment {
   userId: number
   parentId: number | null
   body: string
+  likeCount: number
+  dislikeCount: number
+  currentUserReaction: string | null
   createdAt: string
-  // 扩展字段
   authorName?: string
-  children?: Comment[] // 存放子评论
+  children?: Comment[]
 }
 
 // 5. 接龙模块
@@ -240,6 +242,20 @@ export interface Inspiration {
   content: string
   createdAt: string
   updatedAt: string
+}
+
+// ===== 通知 =====
+export interface Notification {
+  id: number
+  userId: number
+  type: string
+  sourceId: number
+  sourceType: string
+  actorId: number
+  actorName: string
+  body: string
+  isRead: boolean
+  createdAt: string
 }
 
 // ===== 写作中心相关类型 =====

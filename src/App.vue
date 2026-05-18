@@ -1,13 +1,37 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useUserStore } from './stores/user'
 import { useRouter } from 'vue-router'
+import http from '@/api/http'
 
 const userStore = useUserStore()
 const router = useRouter()
 
 const showCreateMenu = ref(false)
 let hideTimer: ReturnType<typeof setTimeout> | null = null
+const unreadCount = ref(0)
+let pollTimer: ReturnType<typeof setInterval> | null = null
+
+const fetchUnreadCount = async () => {
+  if (!userStore.isLogin()) return
+  try {
+    const res = await http.get('/notifications/unread-count')
+    unreadCount.value = res.data ?? 0
+  } catch (e) {
+    // ignore
+  }
+}
+
+onMounted(() => {
+  if (userStore.isLogin()) fetchUnreadCount()
+  pollTimer = setInterval(() => {
+    if (userStore.isLogin()) fetchUnreadCount()
+  }, 30000)
+})
+
+onUnmounted(() => {
+  if (pollTimer) clearInterval(pollTimer)
+})
 
 const createSubItems = [
   { label: '设定编写', path: '/create/setting', desc: '世界观与角色设定' },
@@ -44,7 +68,7 @@ function handleLogout() {
       <!-- 主导航 -->
       <nav class="main-nav">
         <router-link to="/" class="nav-link">广场</router-link>
-        <router-link to="/explore" class="nav-link">发现</router-link>
+<!--        <router-link to="/explore" class="nav-link">发现</router-link>-->
 
         <template v-if="userStore.isLogin()">
           <div
@@ -87,6 +111,10 @@ function handleLogout() {
           <router-link to="/register" class="btn-register">注册</router-link>
         </template>
         <template v-else>
+          <router-link to="/notifications" class="btn-notify">
+            🔔
+            <span v-if="unreadCount > 0" class="badge">{{ unreadCount > 99 ? '99+' : unreadCount }}</span>
+          </router-link>
           <button @click="handleLogout" class="btn-logout">退出登录</button>
         </template>
       </div>
@@ -302,5 +330,38 @@ function handleLogout() {
 .dropdown-leave-to {
   opacity: 0;
   transform: translateY(-4px) scaleY(0.97);
+}
+
+/* 通知铃铛按钮 */
+.btn-notify {
+  position: relative;
+  padding: 8px 12px;
+  background: white;
+  border: 1px solid #dadce0;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 16px;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  transition: background 0.2s;
+}
+.btn-notify:hover { background: #f8f9fa; }
+.badge {
+  position: absolute;
+  top: -4px;
+  right: -6px;
+  background: #ea4335;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  min-width: 16px;
+  height: 16px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 3px;
+  line-height: 1;
 }
 </style>

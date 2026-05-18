@@ -3,7 +3,7 @@ import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import http from '@/api/http'
 import { useUserStore } from '@/stores/user'
-import type { GroupDetail, GroupMemberInfo, GroupMessage, UserProfileVO, ChainDetailVO, ChainSegmentVO, WritingBattle, BattleEntry } from '@/types'
+import type { GroupDetail, GroupMemberInfo, GroupMessage, UserProfileVO, ChainDetailVO, WritingBattle, BattleEntry } from '@/types'
 
 const router = useRouter()
 const route = useRoute()
@@ -98,6 +98,7 @@ function isBattleParticipant(battle: WritingBattle | null): boolean {
 
 // ---- Init ----
 onMounted(async () => {
+  if (!groupId.value || isNaN(groupId.value)) return
   await loadGroup()
   await loadMessages()
   startPolling()
@@ -106,6 +107,7 @@ onMounted(async () => {
 onUnmounted(() => { stopPolling() })
 
 async function loadGroup() {
+  if (!groupId.value || isNaN(groupId.value)) return
   try {
     const res = await http.get(`/groups/${groupId.value}`)
     group.value = res.data as GroupDetail
@@ -114,6 +116,8 @@ async function loadGroup() {
 
 async function loadMessages(since?: number) {
   if (isLoading.value) return
+  if (!groupId.value || isNaN(groupId.value)) return
+  if (!userStore.isLogin()) return
   isLoading.value = true
   try {
     const params: any = {}
@@ -134,7 +138,11 @@ async function loadMessages(since?: number) {
 
 function startPolling() {
   stopPolling()
-  pollTimer = setInterval(() => { if (sinceId.value > 0) loadMessages(sinceId.value) }, 3000)
+  pollTimer = setInterval(() => {
+    if (!userStore.isLogin()) { stopPolling(); return }
+    if (!groupId.value || isNaN(groupId.value)) return
+    if (sinceId.value > 0) loadMessages(sinceId.value)
+  }, 3000)
 }
 function stopPolling() { if (pollTimer) { clearInterval(pollTimer); pollTimer = null } }
 

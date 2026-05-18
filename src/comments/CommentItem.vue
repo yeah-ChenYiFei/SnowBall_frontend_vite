@@ -1,54 +1,62 @@
 <script setup lang="ts">
 import { ref, computed, watch, nextTick } from 'vue'
+import http from '@/api/http'
 import { useUserStore } from '@/stores/user'
 import type { Comment } from '@/types'
 
 const props = defineProps<{
   comment: Comment
   parentAuthorName?: string
-  activeReplyId: number | null // ✅ 接收当前处于激活状态的评论 ID
+  activeReplyId: number | null
 }>()
 
 const emit = defineEmits<{
   (e: 'open-reply', id: number | null): void
   (e: 'submit-reply', parentId: number, body: string): void
+  (e: 'refresh'): void
 }>()
 
 const userStore = useUserStore()
 const replyText = ref('')
 const replyRef = ref<HTMLTextAreaElement | null>(null)
 
-// 判断当前评论是不是那个被激活的
 const isReplying = computed(() => props.comment.id === props.activeReplyId)
+const liked = computed(() => props.comment.currentUserReaction === 'LIKE')
 
-// 点击回复按钮
 const handleReplyClick = () => {
   if (isReplying.value) {
-    emit('open-reply', null) // 如果已经打开了，再点就关闭
+    emit('open-reply', null)
   } else {
     replyText.value = ''
-    emit('open-reply', props.comment.id) // 否则请求打开自己
+    emit('open-reply', props.comment.id)
   }
 }
 
-// 取消回复
 const handleCancel = () => {
   emit('open-reply', null)
 }
 
-// 提交回复
 const handleSubmitReply = () => {
   if (!replyText.value.trim()) return
   if (!userStore.isLogin()) return alert('请先登录')
   emit('submit-reply', props.comment.id, replyText.value.trim())
 }
 
-// ✅ 监听状态：一旦变为 true，自动聚焦小输入框
+const handleLike = async () => {
+  if (!userStore.isLogin()) return alert('请先登录')
+  try {
+    await http.post(`/posts/${props.comment.postId}/comments/${props.comment.id}/react?type=LIKE`)
+    emit('refresh')
+  } catch (e: any) {
+    alert(e.message || '操作失败')
+  }
+}
+
 watch(isReplying, (newVal) => {
   if (newVal) {
     nextTick(() => replyRef.value?.focus())
   } else {
-    replyText.value = '' // 关闭时清空内容
+    replyText.value = ''
   }
 })
 </script>
@@ -64,9 +72,17 @@ watch(isReplying, (newVal) => {
         <span v-if="parentAuthorName" class="reply-tag">/@{{ parentAuthorName }}</span>
         {{ comment.body }}
       </p>
-      <button class="btn-reply" @click="handleReplyClick">回复</button>
+      <div class="comment-actions">
+        <button
+          class="btn-like"
+          :class="{ liked }"
+          @click="handleLike"
+        >
+          {{ liked ? '❤️' : '🤍' }} {{ comment.likeCount || 0 }}
+        </button>
+        <button class="btn-reply" @click="handleReplyClick">回复</button>
+      </div>
 
-      <!-- ✅ 新增：紧贴着评论的下方小输入框 -->
       <div v-if="isReplying" class="inline-reply-box">
         <textarea
           ref="replyRef"
@@ -82,7 +98,6 @@ watch(isReplying, (newVal) => {
       </div>
     </div>
 
-    <!-- 递归子评论，必须把激活状态和事件继续透传给子级 -->
     <div v-if="comment.children && comment.children.length > 0" class="children-thread">
       <CommentItem
         v-for="child in comment.children"
@@ -90,8 +105,9 @@ watch(isReplying, (newVal) => {
         :comment="child"
         :parent-author-name="comment.authorName"
         :active-reply-id="activeReplyId"
-        @open-reply="(id) => emit('open-reply', id)"
-        @submit-reply="(pid, body) => emit('submit-reply', pid, body)"
+        @open-reply="(id: number | null) => emit('open-reply', id)"
+        @submit-reply="(pid: number, body: string) => emit('submit-reply', pid, body)"
+        @refresh="emit('refresh')"
       />
     </div>
   </div>
@@ -104,11 +120,14 @@ watch(isReplying, (newVal) => {
 .comment-author { color: #1a73e8; font-weight: 600; }
 .comment-body { margin: 0 0 8px 0; font-size: 15px; line-height: 1.5; color: #333; }
 .reply-tag { color: #1a73e8; font-size: 13px; margin-right: 4px; }
-.btn-reply { background: none; border: none; color: #999; font-size: 13px; cursor: pointer; padding: 0; }
+.comment-actions { display: flex; gap: 16px; align-items: center; }
+.btn-like { background: none; border: none; cursor: pointer; font-size: 14px; padding: 2px 4px; border-radius: 4px; }
+.btn-like:hover { background: #fff0f0; }
+.btn-like.liked { font-weight: 600; }
+.btn-reply { background: none; border: none; color: #999; font-size: 13px; cursor: pointer; padding: 2px 4px; }
 .btn-reply:hover { color: #1a73e8; }
 .children-thread { margin-left: 20px; padding-left: 16px; border-left: 2px solid #e8eaed; }
 
-/* ✅ 小输入框的专属样式 */
 .inline-reply-box {
   margin-top: 10px;
   background: #f8f9fa;

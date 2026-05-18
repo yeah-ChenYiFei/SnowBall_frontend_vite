@@ -93,6 +93,7 @@ defineExpose({ loadComments })
         :active-reply-id="activeReplyId"
         @open-reply="handleOpenReply"
         @submit-reply="handleSubmitReply"
+        @refresh="loadComments"
       />
 
       <div v-if="flatComments.length === 0" class="empty-comments">
