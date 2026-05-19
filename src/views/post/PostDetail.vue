@@ -6,6 +6,7 @@ import http from '@/api/http'
 import { useUserStore } from '@/stores/user'
 import { ROLES } from '@/constants/role' // ✅ 引入角色常量
 import CommentList from '@/comments/CommentList.vue'
+import UserHoverMenu from '@/components/UserHoverMenu.vue'
 import type { Post } from '@/types'
 
 const route = useRoute()
@@ -13,6 +14,17 @@ const router = useRouter()
 const userStore = useUserStore()
 const post = ref<Post | null>(null)
 const isLoading = ref(true)
+
+// Hover menu
+const hoverUserId = ref(0)
+const hoverEl = ref<HTMLElement | null>(null)
+const showHoverMenu = ref(false)
+let hoverTimer: ReturnType<typeof setTimeout> | null = null
+function onAuthorEnter(e: MouseEvent, userId: number) {
+  if (hoverTimer) clearTimeout(hoverTimer)
+  hoverUserId.value = userId; hoverEl.value = e.currentTarget as HTMLElement; showHoverMenu.value = true
+}
+function onAuthorLeave() { hoverTimer = setTimeout(() => { showHoverMenu.value = false }, 300) }
 
 const typeMap: Record<string, string> = {
   OC: '原创角色', SETTING: '世界观', FRAGMENT: '小说片段', BOOK_INFO: '书籍信息'
@@ -99,7 +111,12 @@ onMounted(() => { loadPost() })
         <div class="post-header">
           <span class="type-badge">{{ typeMap[post.type] || post.type }}</span>
           <span class="meta-info">
-            👤 {{ post.authorName || '匿名' }} · {{ new Date(post.createdAt).toLocaleString() }} · V{{ post.version }}
+            <span
+              class="author-link"
+              @mouseenter.stop="onAuthorEnter($event, post.userId)"
+              @mouseleave="onAuthorLeave"
+            >👤 {{ post.authorName || '匿名' }}</span>
+             · {{ new Date(post.createdAt).toLocaleString() }} · V{{ post.version }}
           </span>
         </div>
 
@@ -158,6 +175,14 @@ onMounted(() => { loadPost() })
       <CommentList :post-id="post.id" />
     </div>
 
+    <UserHoverMenu
+      v-if="showHoverMenu && hoverEl && hoverUserId"
+      :user-id="hoverUserId"
+      source="POST"
+      :trigger-el="hoverEl"
+      @close="showHoverMenu = false"
+    />
+
     <div v-else class="error-state">
       <p>帖子不存在或已被删除</p>
       <router-link to="/">返回广场</router-link>
@@ -178,6 +203,8 @@ onMounted(() => { loadPost() })
 .post-content { }
 .post-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; color: #5f6368; font-size: 14px; }
 .type-badge { background: #e8f0fe; color: #1a73e8; padding: 4px 10px; border-radius: 4px; font-size: 12px; }
+.author-link { cursor: pointer; padding: 2px 6px; border-radius: 4px; transition: background 0.15s; }
+.author-link:hover { background: #e8f0fe; color: #1a73e8; }
 .post-title { font-size: 28px; font-weight: 700; color: #202124; margin: 0 0 16px 0; line-height: 1.3; }
 .post-tags { display: flex; gap: 8px; margin-bottom: 24px; flex-wrap: wrap; }
 .tag-pill { background: #f1f3f4; color: #5f6368; padding: 4px 12px; border-radius: 12px; font-size: 13px; }

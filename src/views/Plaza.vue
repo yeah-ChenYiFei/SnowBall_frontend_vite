@@ -4,9 +4,28 @@ import { useRouter } from 'vue-router'
 import http from '@/api/http'
 import { useUserStore } from '@/stores/user'
 import type { Post, Inspiration } from '@/types'
+import UserHoverMenu from '@/components/UserHoverMenu.vue'
 
 const router = useRouter()
 const userStore = useUserStore()
+
+// Hover menu state
+const hoverUserId = ref(0)
+const hoverEl = ref<HTMLElement | null>(null)
+const showHoverMenu = ref(false)
+let hoverTimer: ReturnType<typeof setTimeout> | null = null
+
+function onAuthorEnter(e: MouseEvent, userId: number) {
+  if (hoverTimer) clearTimeout(hoverTimer)
+  hoverUserId.value = userId
+  hoverEl.value = e.currentTarget as HTMLElement
+  showHoverMenu.value = true
+}
+function onAuthorLeave() {
+  hoverTimer = setTimeout(() => {
+    showHoverMenu.value = false
+  }, 300)
+}
 
 const posts = ref<Post[]>([])
 const isLoadingPosts = ref(false)
@@ -152,7 +171,11 @@ onMounted(() => {
           <p class="card-content">{{ truncateText(post.body || '', 150) }}</p>
 
           <div class="card-footer">
-            <span class="footer-author">👤 {{ post.authorName || '匿名' }}</span>
+            <span
+              class="footer-author"
+              @mouseenter.stop="onAuthorEnter($event, post.userId)"
+              @mouseleave="onAuthorLeave"
+            >👤 {{ post.authorName || '匿名' }}</span>
             <div class="footer-stats">
               <span class="stat-item">👁️ {{ post.viewCount || 0 }}</span>
               <button
@@ -219,6 +242,13 @@ onMounted(() => {
         </button>
       </div>
     </aside>
+    <UserHoverMenu
+      v-if="showHoverMenu && hoverEl && hoverUserId"
+      :user-id="hoverUserId"
+      source="POST"
+      :trigger-el="hoverEl"
+      @close="showHoverMenu = false"
+    />
   </div>
 </template>
 
@@ -332,6 +362,14 @@ onMounted(() => {
 
 .footer-author {
   color: #5f6368;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: background 0.15s;
+}
+.footer-author:hover {
+  background: #e8f0fe;
+  color: #1a73e8;
 }
 
 .footer-stats {

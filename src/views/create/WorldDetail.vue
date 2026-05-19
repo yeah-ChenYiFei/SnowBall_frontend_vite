@@ -3,7 +3,8 @@ import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import http from '@/api/http'
 import { useUserStore } from '@/stores/user'
-import type { World, WorldEntry, WorldRelation, Result } from '@/types'
+import type { World, WorldEntry, WorldRelation, Result, Collaborator, WorldChange } from '@/types'
+import WorldCollaboratorModal from '@/components/WorldCollaboratorModal.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -19,6 +20,47 @@ const customTypes = ref<string[]>([])
 const selectedType = ref('')
 const searchKeyword = ref('')
 const message = ref('')
+
+// ---- 共创 ----
+const showCollaboratorModal = ref(false)
+const collaborators = ref<Collaborator[]>([])
+const changes = ref<WorldChange[]>([])
+const showChangesPanel = ref(false)
+
+async function loadCollaborators() {
+  try {
+    const res = await http.get(`/worlds/${worldId}/collaborators`)
+    collaborators.value = res.data || []
+  } catch { /* */ }
+}
+async function loadChanges() {
+  try {
+    const res = await http.get(`/worlds/${worldId}/changes`)
+    changes.value = res.data || []
+  } catch { /* */ }
+}
+async function removeCollaborator(userId: number) {
+  try {
+    await http.delete(`/worlds/${worldId}/collaborators/${userId}`)
+    await loadCollaborators()
+  } catch (e: any) { alert(e.message || '移除失败') }
+}
+async function approveChange(changeId: number) {
+  try {
+    await http.put(`/worlds/${worldId}/changes/${changeId}/approve`)
+    await Promise.all([loadChanges(), loadEntries()])
+  } catch (e: any) { alert(e.message || '操作失败') }
+}
+const rejectReason = ref('')
+async function rejectChange(changeId: number) {
+  try {
+    await http.put(`/worlds/${worldId}/changes/${changeId}/reject`, { action: 'REJECT', rejectReason: rejectReason.value })
+    rejectReason.value = ''
+    await loadChanges()
+  } catch (e: any) { alert(e.message || '操作失败') }
+}
+
+const changeTypeLabel: Record<string, string> = { CREATE: '新增', UPDATE: '修改', DELETE: '删除' }
 
 // ---- 编辑世界 ----
 const isWorldCreator = computed(() => world.value?.userId === userStore.userInfo?.id)
@@ -358,6 +400,7 @@ function onGraphWheel(e: WheelEvent) {
 // ---- 生命周期 ----
 onMounted(() => {
   loadWorld(); loadEntries(); loadTypes(); loadRelations()
+  loadCollaborators(); loadChanges()
 })
 </script>
 
@@ -376,9 +419,59 @@ onMounted(() => {
           <span class="wd-desc">{{ world?.description || '暂无简介' }}</span>
           <button v-if="isWorldCreator" class="btn-edit-world" @click="openEditWorld">⚙️ 编辑世界</button>
           <button v-if="isWorldCreator" class="btn-delete-world" @click="deleteWorld_confirm">🗑 删除世界</button>
+          <button v-if="isWorldCreator" class="btn-manage-collab" @click="showCollaboratorModal = true">👥 共创者 ({{ collaborators.length }})</button>
+          <button
+            v-if="isWorldCreator && changes.length > 0"
+            class="btn-pending-changes"
+            @click="showChangesPanel = !showChangesPanel"
+          >
+            📋 待审批 ({{ changes.filter(c => c.status === 'PENDING').length }})
+          </button>
         </div>
       </div>
     </div>
+
+    <!-- 共创者管理 -->
+    <div v-if="isWorldCreator" class="collab-section">
+      <h3>共创者</h3>
+      <div v-if="collaborators.length === 0" class="empty-hint">暂无共创者</div>
+      <div v-for="c in collaborators" :key="c.userId" class="collab-row">
+        <span>{{ c.username || '用户' + c.userId }}</span>
+        <button class="btn-remove-collab" @click="removeCollaborator(c.userId)">移除</button>
+      </div>
+    </div>
+
+    <!-- 待审批修改 -->
+    <div v-if="isWorldCreator && showChangesPanel" class="changes-section">
+      <h3>待审批修改</h3>
+      <div v-if="changes.filter(c => c.status === 'PENDING').length === 0" class="empty-hint">暂无待审批修改</div>
+      <div v-for="c in changes.filter(c => c.status === 'PENDING')" :key="c.id" class="change-card">
+        <div class="change-header">
+          <span class="change-type" :class="'change-' + c.changeType">{{ changeTypeLabel[c.changeType] || c.changeType }}</span>
+          <span class="change-user">{{ c.username }}</span>
+          <span class="change-time">{{ new Date(c.createdAt).toLocaleString() }}</span>
+        </div>
+        <div class="change-body">
+          <strong>{{ c.entryName }}</strong>
+          <p>{{ c.entryContent?.substring(0, 200) }}{{ c.entryContent?.length > 200 ? '...' : '' }}</p>
+        </div>
+        <div class="change-actions">
+          <button class="btn-approve" @click="approveChange(c.id)">✓ 同意</button>
+          <div class="reject-row">
+            <input v-model="rejectReason" class="reject-input" placeholder="拒绝理由（可选）" />
+            <button class="btn-reject" @click="rejectChange(c.id)">✗ 拒绝</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <WorldCollaboratorModal
+      :show="showCollaboratorModal"
+      :world-id="worldId"
+      :existing-collaborators="collaborators"
+      @close="showCollaboratorModal = false"
+      @added="loadCollaborators"
+    />
 
     <!-- 编辑世界弹窗 -->
     <transition name="modal">
@@ -971,4 +1064,38 @@ onMounted(() => {
 .slide-leave-active { transition: all 0.15s ease; }
 .slide-enter-from { opacity: 0; max-height: 0; }
 .slide-leave-to { opacity: 0; max-height: 0; }
+
+/* Collaborator & Changes sections */
+.collab-section, .changes-section {
+  background: #fff; border-radius: 12px; padding: 20px;
+  margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+.collab-section h3, .changes-section h3 { margin: 0 0 12px; font-size: 16px; color: #202124; }
+.empty-hint { text-align: center; color: #999; font-size: 13px; padding: 12px; }
+.collab-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #f1f3f4; font-size: 14px; }
+.collab-row:last-child { border-bottom: none; }
+.btn-remove-collab { padding: 4px 12px; background: #fff; color: #d93025; border: 1px solid #f28b82; border-radius: 4px; cursor: pointer; font-size: 12px; }
+.btn-remove-collab:hover { background: #fce8e6; }
+.btn-manage-collab { padding: 6px 14px; background: #e8f0fe; color: #1a73e8; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; margin-left: 8px; }
+.btn-pending-changes { padding: 6px 14px; background: #fef7e0; color: #f9ab00; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; margin-left: 6px; }
+
+.change-card { border: 1px solid #e8eaed; border-radius: 8px; padding: 14px; margin-bottom: 10px; }
+.change-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 13px; }
+.change-type { padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 500; }
+.change-CREATE { background: #e6f4ea; color: #137333; }
+.change-UPDATE { background: #e8f0fe; color: #1a73e8; }
+.change-DELETE { background: #fce8e6; color: #c5221f; }
+.change-user { font-weight: 600; color: #202124; }
+.change-time { color: #999; margin-left: auto; }
+.change-body { font-size: 14px; color: #5f6368; margin-bottom: 10px; }
+.change-body strong { color: #333; }
+.change-body p { margin: 4px 0 0; }
+.change-actions { display: flex; align-items: center; gap: 10px; }
+.btn-approve { padding: 6px 16px; background: #1a73e8; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; }
+.btn-approve:hover { background: #1557b0; }
+.reject-row { display: flex; gap: 6px; align-items: center; flex: 1; }
+.reject-input { flex: 1; padding: 5px 10px; border: 1px solid #dadce0; border-radius: 6px; font-size: 13px; outline: none; }
+.reject-input:focus { border-color: #1a73e8; }
+.btn-reject { padding: 6px 16px; background: #fff; color: #d93025; border: 1px solid #f28b82; border-radius: 6px; cursor: pointer; font-size: 13px; white-space: nowrap; }
+.btn-reject:hover { background: #fce8e6; }
 </style>

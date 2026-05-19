@@ -2,7 +2,8 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import http from '@/api/http'
-import type { World, Result } from '@/types'
+import type { World } from '@/types'
+import WorldCollaboratorModal from '@/components/WorldCollaboratorModal.vue'
 
 const router = useRouter()
 
@@ -10,6 +11,22 @@ const worlds = ref<World[]>([])
 const showModal = ref(false)
 const isSubmitting = ref(false)
 const message = ref('')
+
+// Co-create state
+const showCollaboratorModal = ref(false)
+const collaboratorWorldId = ref(0)
+const collaboratorWorldCollabs = ref<any[]>([])
+
+function openCollaboratorModal(e: Event, w: World) {
+  e.stopPropagation()
+  collaboratorWorldId.value = w.id
+  collaboratorWorldCollabs.value = w.collaborators || []
+  showCollaboratorModal.value = true
+}
+
+function onCollaboratorAdded() {
+  loadWorlds()
+}
 
 const form = ref({
   name: '',
@@ -80,10 +97,17 @@ onMounted(loadWorlds)
       >
         <div class="card-name">
           {{ w.name }}
-<!--          <span v-if="!w.isPublic" class="private-badge">🔒 私有</span>-->
+          <span v-if="w.isCollaborator && !w.isOwner" class="shared-badge">👥 共创</span>
         </div>
         <div class="card-meta">
           <span v-if="w.type" class="card-type">{{ w.type }}</span>
+          <button
+            v-if="w.isOwner"
+            class="btn-co-create"
+            @click="openCollaboratorModal($event, w)"
+          >
+            共创
+          </button>
         </div>
         <div class="card-desc">{{ w.description || '暂无简介' }}</div>
       </div>
@@ -144,6 +168,13 @@ onMounted(loadWorlds)
         </div>
       </div>
     </transition>
+    <WorldCollaboratorModal
+      :show="showCollaboratorModal"
+      :world-id="collaboratorWorldId"
+      :existing-collaborators="collaboratorWorldCollabs"
+      @close="showCollaboratorModal = false"
+      @added="onCollaboratorAdded"
+    />
   </div>
 </template>
 
@@ -236,6 +267,9 @@ onMounted(loadWorlds)
 
 .card-meta {
   margin-bottom: 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
 .card-type {
@@ -245,6 +279,27 @@ onMounted(loadWorlds)
   color: #1a73e8;
   padding: 2px 10px;
   border-radius: 20px;
+}
+
+.btn-co-create {
+  font-size: 12px;
+  padding: 3px 10px;
+  background: #1a73e8;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.btn-co-create:hover { background: #1557b0; }
+
+.shared-badge {
+  font-size: 12px;
+  background: #e6f4ea;
+  color: #137333;
+  padding: 2px 8px;
+  border-radius: 4px;
+  margin-left: 8px;
 }
 
 .card-desc {

@@ -193,6 +193,9 @@ export interface World {
   isPublic: boolean
   createdAt: string
   updatedAt: string
+  collaborators?: Collaborator[]
+  isOwner?: boolean
+  isCollaborator?: boolean
 }
 
 export interface WorldEntry {
@@ -281,5 +284,54 @@ export interface Article {
   createdAt: string
   updatedAt?: string
   authorName?: string
+}
+
+// ===== 好友 =====
+export interface Friend {
+  userId: number
+  username: string
+  avatarUrl?: string
+  since: string
+}
+
+export interface FriendshipStatus {
+  status: 'FRIEND' | 'PENDING_TO_THEM' | 'PENDING_FROM_THEM' | 'NONE' | 'SELF'
+  friendshipId?: number
+}
+
+// ===== 私聊 =====
+export interface PrivateMessage {
+  id: number
+  senderId: number
+  receiverId: number
+  senderName: string
+  body: string
+  isRead: boolean
+  createdAt: string
+}
+
+// ===== 共创 =====
+export interface Collaborator {
+  userId: number
+  username: string
+  avatarUrl?: string
+  role: string
+  since: string
+}
+
+export interface WorldChange {
+  id: number
+  worldId: number
+  userId: number
+  username: string
+  entryId: number | null
+  entryName: string
+  entryType: string
+  entryContent: string
+  changeType: 'CREATE' | 'UPDATE' | 'DELETE'
+  status: 'PENDING' | 'APPROVED' | 'REJECTED'
+  rejectReason?: string
+  createdAt: string
+  reviewedAt?: string
 }
 

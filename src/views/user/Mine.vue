@@ -6,11 +6,13 @@ import http from '@/api/http'
 import { useUserStore } from '@/stores/user'
 import { ROLES, ROLE_LABEL_MAP } from '@/constants/role' // ✅ 引入角色常量
 import type { UserProfileVO } from '@/types'
+import FriendListModal from '@/components/FriendListModal.vue'
 
 const router = useRouter()
 const userStore = useUserStore()
 const profileData = ref<UserProfileVO | null>(null)
 const isLoading = ref(true)
+const showFriendModal = ref(false)
 
 const loadData = async () => {
   try {
@@ -65,6 +67,11 @@ onMounted(async () => {
           <span class="label">我的群组</span>
           <span class="desc">私密协作空间</span>
         </div>
+        <div class="shortcut-card" @click="showFriendModal = true">
+          <span class="icon">👫</span>
+          <span class="label">我的好友</span>
+          <span class="desc">管理好友列表</span>
+        </div>
         <div class="shortcut-card" @click="router.push('/create')">
           <span class="icon">✍️</span>
           <span class="label">发布内容</span>
@@ -108,6 +115,7 @@ onMounted(async () => {
         </ul>
       </div>
     </template>
+    <FriendListModal :show="showFriendModal" @close="showFriendModal = false" />
   </div>
 </template>
 
@@ -172,7 +180,7 @@ onMounted(async () => {
 }
 .shortcuts-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 16px;
   margin-bottom: 24px;
 }

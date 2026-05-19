@@ -29,6 +29,7 @@ import WritingCenter from '@/views/writing/WritingCenter.vue'
 import WritingEditor from '@/views/writing/WritingEditor.vue'
 import WritingLibrary from '@/views/writing/WritingLibrary.vue'
 import WritingDiary from '@/views/writing/WritingDiary.vue'
+import ChatView from '@/views/chat/ChatView.vue'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -58,6 +59,8 @@ const router = createRouter({
     { path: '/writing/library', component: WritingLibrary },
     { path: '/writing/diary', component: WritingDiary },
     { path: '/writing/:id', component: WritingEditor },
+    { path: '/chat', component: ChatView, meta: { requiresAuth: true } },
+    { path: '/chat/:userId', component: ChatView, meta: { requiresAuth: true } },
 
     // ✅ 示例：未来如果你加了后台管理页面，就这样配
     // { path: '/admin', component: () => import('@/views/admin/Dashboard.vue'), meta: { requiresAuth: true, requiredRoles: [ROLES.SYS_ADMIN] } }

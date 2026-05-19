@@ -3,11 +3,13 @@ import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import http from '@/api/http'
 import { useUserStore } from '@/stores/user'
+import { useFriendStore } from '@/stores/friend'
 import type { GroupDetail, GroupMemberInfo, GroupMessage, UserProfileVO, ChainDetailVO, WritingBattle, BattleEntry } from '@/types'
 
 const router = useRouter()
 const route = useRoute()
 const userStore = useUserStore()
+const friendStore = useFriendStore()
 
 const groupId = computed(() => Number(route.params.groupId))
 
@@ -550,6 +552,11 @@ function formatDate(iso: string): string {
               <div class="profile-avatar-big" :style="{ background: avatarColor(profilePopup.user.user.id) }">{{ profilePopup.user.user.username.charAt(0) }}</div>
               <div><div class="profile-username">{{ profilePopup.user.user.username }}</div><div class="profile-role">{{ profilePopup.user.user.role || '用户' }}</div></div>
             </div>
+            <!-- Action buttons -->
+            <div class="profile-actions" v-if="profilePopup.user.user.id !== currentUserId">
+              <button class="profile-action-btn" @click="router.push('/chat/' + profilePopup.user.user.id); closeProfilePopup()">💬 私聊</button>
+              <button class="profile-action-btn" @click="friendStore.sendRequest(profilePopup.user.user.id, 'GROUP', groupId); closeProfilePopup()">➕ 加好友</button>
+            </div>
             <div class="profile-section" v-if="profilePopup.user.posts.length > 0">
               <div class="profile-section-title">最近帖子</div>
               <div v-for="post in profilePopup.user.posts.slice(0, 3)" :key="post.id" class="profile-post"><span class="profile-post-title">{{ post.title }}</span><span class="profile-post-date">{{ formatDate(post.createdAt) }}</span></div>
@@ -751,6 +758,12 @@ function formatDate(iso: string): string {
 .profile-avatar-big { width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 18px; font-weight: 600; flex-shrink: 0; }
 .profile-username { font-size: 16px; font-weight: 600; color: #202124; }
 .profile-role { font-size: 12px; color: #999; }
+.profile-actions { display: flex; gap: 8px; margin-bottom: 10px; }
+.profile-action-btn {
+  flex: 1; padding: 6px 10px; background: #f1f3f4; border: none;
+  border-radius: 6px; cursor: pointer; font-size: 12px; transition: background 0.15s;
+}
+.profile-action-btn:hover { background: #e8f0fe; color: #1a73e8; }
 .profile-section { margin-top: 8px; }
 .profile-section-title { font-size: 12px; font-weight: 500; color: #5f6368; margin-bottom: 6px; }
 .profile-post { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid #f1f3f4; font-size: 13px; }

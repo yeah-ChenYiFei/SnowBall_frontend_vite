@@ -2,9 +2,11 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import http from '@/api/http'
+import { useFriendStore } from '@/stores/friend'
 import type { Notification } from '@/types'
 
 const router = useRouter()
+const friendStore = useFriendStore()
 const notifications = ref<Notification[]>([])
 const isLoading = ref(false)
 const unreadCount = ref(0)
@@ -47,9 +49,23 @@ const markAllRead = async () => {
 
 const handleClick = (n: Notification) => {
   markRead(n.id)
+  if (n.type === 'FRIEND_REQUEST') return // Don't navigate for friend requests
   if (n.sourceType === 'POST' && n.sourceId) {
     router.push(`/post/${n.sourceId}`)
+  } else if (n.sourceType === 'WORLD' && n.sourceId) {
+    router.push(`/create/setting/${n.sourceId}`)
   }
+}
+
+async function handleAcceptFriend(n: Notification) {
+  await markRead(n.id)
+  // sourceId is the friendship ID for FRIEND_REQUEST
+  await friendStore.acceptRequest(n.sourceId)
+}
+
+async function handleRejectFriend(n: Notification) {
+  await markRead(n.id)
+  await friendStore.rejectRequest(n.sourceId)
 }
 
 const typeLabel = (type: string) => {
@@ -58,6 +74,12 @@ const typeLabel = (type: string) => {
     REPLY: '回复',
     LIKE_POST: '赞了帖子',
     LIKE_COMMENT: '赞了评论',
+    FRIEND_REQUEST: '好友请求',
+    FRIEND_ACCEPTED: '已接受好友',
+    WORLD_COLLABORATOR_ADDED: '共创邀请',
+    WORLD_COLLABORATOR_CHANGE: '共创修改',
+    WORLD_CHANGE_APPROVED: '已通过',
+    WORLD_CHANGE_REJECTED: '已拒绝',
   }
   return map[type] || type
 }
@@ -97,6 +119,10 @@ onMounted(() => loadNotifications())
           <span class="notif-actor">{{ n.actorName }}</span>
           <span class="notif-type">{{ typeLabel(n.type) }}</span>
           <span class="notif-text">{{ n.body }}</span>
+        </div>
+        <div class="notif-actions" v-if="n.type === 'FRIEND_REQUEST'" @click.stop>
+          <button class="btn-notif-accept" @click="handleAcceptFriend(n)">同意</button>
+          <button class="btn-notif-reject" @click="handleRejectFriend(n)">拒绝</button>
         </div>
         <div class="notif-time">{{ new Date(n.createdAt).toLocaleString() }}</div>
       </div>
@@ -165,4 +191,15 @@ onMounted(() => loadNotifications())
 .notif-type { color: #5f6368; margin-right: 4px; font-size: 13px; }
 .notif-text { color: #333; }
 .notif-time { font-size: 12px; color: #999; flex-shrink: 0; }
+.notif-actions { display: flex; gap: 6px; flex-shrink: 0; margin-right: 8px; }
+.btn-notif-accept {
+  padding: 4px 12px; background: #1a73e8; color: #fff;
+  border: none; border-radius: 4px; cursor: pointer; font-size: 12px;
+}
+.btn-notif-accept:hover { background: #1557b0; }
+.btn-notif-reject {
+  padding: 4px 12px; background: #fff; color: #d93025;
+  border: 1px solid #f28b82; border-radius: 4px; cursor: pointer; font-size: 12px;
+}
+.btn-notif-reject:hover { background: #fce8e6; }
 </style>
