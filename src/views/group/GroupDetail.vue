@@ -554,6 +554,7 @@ function formatDate(iso: string): string {
             </div>
             <!-- Action buttons -->
             <div class="profile-actions" v-if="profilePopup.user.user.id !== currentUserId">
+              <button class="profile-action-btn" @click="router.push('/profile/' + profilePopup.user.user.id); closeProfilePopup()">👤 个人主页</button>
               <button class="profile-action-btn" @click="router.push('/chat/' + profilePopup.user.user.id); closeProfilePopup()">💬 私聊</button>
               <button class="profile-action-btn" @click="friendStore.sendRequest(profilePopup.user.user.id, 'GROUP', groupId); closeProfilePopup()">➕ 加好友</button>
             </div>

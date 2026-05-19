@@ -336,3 +336,44 @@ export interface WorldChange {
   reviewedAt?: string
 }
 
+// ===== 个人主页新类型 =====
+export interface ContributionDay {
+  date: string
+  count: number
+  items: { id: number; type: string; title: string }[]
+}
+
+export interface RecentProject {
+  id: number
+  type: string
+  title: string
+  content: string
+  createdAt: string
+}
+
+export interface BrowsingHistory {
+  postId: number
+  postTitle: string
+  postType: string
+  authorName?: string
+  viewedAt: string
+}
+
+export interface Activity {
+  id: number
+  type: string // 'CHAIN' | 'BATTLE'
+  title: string
+  groupId: number
+  groupName: string
+  createdAt: string
+}
+
+export interface UserProfileFull {
+  user: UserVO & { signature?: string }
+  recentProjects: RecentProject[]
+  contributions: ContributionDay[]
+  browsingHistory: BrowsingHistory[]
+  activities: Activity[]
+  stats: { posts: number; worlds: number; articles: number; inspirations: number }
+}
+

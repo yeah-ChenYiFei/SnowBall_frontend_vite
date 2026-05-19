@@ -8,8 +8,11 @@ const userStore = useUserStore()
 const router = useRouter()
 
 const showCreateMenu = ref(false)
+const showMyMenu = ref(false)
 let hideTimer: ReturnType<typeof setTimeout> | null = null
+let hideMyTimer: ReturnType<typeof setTimeout> | null = null
 const unreadCount = ref(0)
+const friendUnread = ref(0)
 let pollTimer: ReturnType<typeof setInterval> | null = null
 
 const fetchUnreadCount = async () => {
@@ -23,9 +26,15 @@ const fetchUnreadCount = async () => {
 }
 
 onMounted(() => {
-  if (userStore.isLogin()) fetchUnreadCount()
+  if (userStore.isLogin()) {
+    fetchUnreadCount()
+    fetchFriendUnread()
+  }
   pollTimer = setInterval(() => {
-    if (userStore.isLogin()) fetchUnreadCount()
+    if (userStore.isLogin()) {
+      fetchUnreadCount()
+      fetchFriendUnread()
+    }
   }, 30000)
 })
 
@@ -46,6 +55,21 @@ function openCreateMenu() {
 
 function scheduleHide() {
   hideTimer = setTimeout(() => { showCreateMenu.value = false }, 150)
+}
+
+function openMyMenu() {
+  if (hideMyTimer) { clearTimeout(hideMyTimer); hideMyTimer = null }
+  showMyMenu.value = true
+}
+
+function scheduleHideMy() {
+  hideMyTimer = setTimeout(() => { showMyMenu.value = false }, 150)
+}
+
+const fetchFriendUnread = async () => {
+  if (!userStore.isLogin()) return
+  // Backend endpoint pending — silently set 0 for now
+  friendUnread.value = 0
 }
 
 function handleLogout() {
@@ -97,9 +121,34 @@ function handleLogout() {
             </transition>
           </div>
           <router-link to="/groups" class="nav-link">群组</router-link>
-          <router-link to="/mine" class="nav-link">
+          <div
+            class="nav-dropdown nav-link nav-link-dropdown"
+            :class="{ 'is-active': showMyMenu }"
+            @mouseenter="openMyMenu"
+            @mouseleave="scheduleHideMy"
+          >
             我的 ({{ userStore.userInfo.username }})
-          </router-link>
+            <span class="arrow" :class="{ 'arrow-open': showMyMenu }">▾</span>
+            <transition name="dropdown">
+              <div v-if="showMyMenu" class="dropdown-panel"
+                   @mouseenter="openMyMenu"
+                   @mouseleave="scheduleHideMy">
+                <router-link to="/profile/self" class="dropdown-item" @click="showMyMenu = false">
+                  <span class="item-label">个人主页</span>
+                  <span class="item-desc">查看个人资料与动态</span>
+                </router-link>
+                <router-link to="/books" class="dropdown-item" @click="showMyMenu = false">
+                  <span class="item-label">我的藏书</span>
+                  <span class="item-desc">管理实体书收藏</span>
+                </router-link>
+                <router-link to="/friends" class="dropdown-item" @click="showMyMenu = false">
+                  <span class="item-label">我的好友</span>
+                  <span class="item-desc">好友列表与私聊</span>
+                  <span v-if="friendUnread > 0" class="dropdown-badge">{{ friendUnread > 99 ? '99+' : friendUnread }}</span>
+                </router-link>
+              </div>
+            </transition>
+          </div>
         </template>
       </nav>
 
@@ -318,6 +367,19 @@ function handleLogout() {
   font-size: 12px;
   color: #5f6368;
   margin-top: 2px;
+}
+
+.dropdown-badge {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: #ea4335;
+  color: #fff;
+  border-radius: 10px;
+  padding: 1px 6px;
+  font-size: 11px;
+  font-weight: 600;
 }
 
 /* Vue transition: dropdown */

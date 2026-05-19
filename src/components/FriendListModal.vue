@@ -19,7 +19,7 @@ watch(() => props.show, (val) => {
 
 function goToProfile(userId: number) {
   emit('close')
-  router.push(`/mine?userId=${userId}`)
+  router.push(`/profile/${userId}`)
 }
 
 async function handleAccept(friend: { id?: number; userId: number }) {

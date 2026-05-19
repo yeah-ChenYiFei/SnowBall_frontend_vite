@@ -20,10 +20,11 @@ import VersionHistory from '@/views/post/VersionHistory.vue'
 import ChainDetail from '@/views/post/ChainDetail.vue'
 import Login from '@/views/user/Login.vue'
 import Register from '@/views/user/Register.vue'
-import Mine from '@/views/user/Mine.vue'
+import Profile from '@/views/user/Profile.vue'
 import Groups from '@/views/user/Groups.vue'
 import GroupDetail from '@/views/group/GroupDetail.vue'
 import BookManage from '@/views/user/BookManage.vue'
+import Friends from '@/views/user/Friends.vue'
 import Notifications from '@/views/user/Notifications.vue'
 import WritingCenter from '@/views/writing/WritingCenter.vue'
 import WritingEditor from '@/views/writing/WritingEditor.vue'
@@ -49,10 +50,12 @@ const router = createRouter({
     { path: '/chain/:id', component: ChainDetail },
     { path: '/login', component: Login },
     { path: '/register', component: Register },
-    { path: '/mine', component: Mine, meta: { requiresAuth: true } },
+    { path: '/profile/:userId', component: Profile, meta: { requiresAuth: true } },
+    { path: '/mine', redirect: (to: any) => `/profile/${to.query.userId || 'self'}` },
+    { path: '/books', component: BookManage, meta: { requiresAuth: true } },
+    { path: '/friends', component: Friends, meta: { requiresAuth: true } },
     { path: '/groups', component: Groups, meta: { requiresAuth: true } },
     { path: '/groups/:groupId', component: GroupDetail, meta: { requiresAuth: true } },
-    { path: '/books', component: BookManage, meta: { requiresAuth: true } },
     { path: '/notifications', component: Notifications, meta: { requiresAuth: true } },
     { path: '/writing', component: WritingCenter },
     { path: '/writing/new', component: WritingEditor },

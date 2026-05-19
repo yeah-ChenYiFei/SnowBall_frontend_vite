@@ -39,7 +39,7 @@ onMounted(async () => {
 
 function goToProfile() {
   emit('close')
-  router.push(`/mine?userId=${props.userId}`)
+  router.push(`/profile/${props.userId}`)
 }
 
 function goToChat() {
