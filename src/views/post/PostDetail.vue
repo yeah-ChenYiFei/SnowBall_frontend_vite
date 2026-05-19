@@ -44,6 +44,24 @@ const loadPost = async () => {
   try {
     const res = await http.get(`/posts/${route.params.id}`)
     post.value = res.data
+    // Record browsing history to localStorage
+    if (post.value && userStore.userInfo?.id) {
+      const key = `browseHistory_${userStore.userInfo.id}`
+      try {
+        const stored = localStorage.getItem(key)
+        const history: { postId: number; postTitle: string; postType: string; authorName?: string; viewedAt: string }[] = stored ? JSON.parse(stored) : []
+        // Remove existing entry for same post, add at front
+        const filtered = history.filter(h => h.postId !== post.value!.id)
+        filtered.unshift({
+          postId: post.value.id,
+          postTitle: post.value.title,
+          postType: post.value.type,
+          authorName: post.value.authorName,
+          viewedAt: new Date().toISOString(),
+        })
+        localStorage.setItem(key, JSON.stringify(filtered.slice(0, 50)))
+      } catch { /* */ }
+    }
   } catch (error) {
     console.error('加载失败', error)
   } finally {
@@ -181,6 +199,7 @@ onMounted(() => { loadPost() })
       source="POST"
       :trigger-el="hoverEl"
       @close="showHoverMenu = false"
+      @cancelClose="if (hoverTimer) { clearTimeout(hoverTimer); hoverTimer = null }"
     />
 
     <div v-else class="error-state">

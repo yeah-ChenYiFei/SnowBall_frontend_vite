@@ -76,6 +76,7 @@ const showChainModal = ref(false)
 const showBattleModal = ref(false)
 const chainTitle = ref('')
 const chainFirstBody = ref('')
+const chainDeadline = ref('')
 const battleTopic = ref('')
 const battleDesc = ref('')
 const battleDeadline = ref('')
@@ -85,6 +86,13 @@ const battleSubmitting = ref(false)
 // Polling
 let pollTimer: ReturnType<typeof setInterval> | null = null
 const sinceId = ref<number>(0)
+
+function isExpired(deadline: string | null | undefined): boolean {
+  if (!deadline) return false
+  const d = new Date(deadline)
+  d.setHours(23, 59, 59, 999)
+  return Date.now() > d.getTime()
+}
 
 // ---- Computed ----
 const currentUserId = computed(() => (userStore.userInfo as any)?.id ?? 0)
@@ -315,10 +323,12 @@ async function createChain() {
     await http.post(`/groups/${groupId.value}/chains`, {
       title: chainTitle.value,
       first_segment_body: chainFirstBody.value,
+      deadline: chainDeadline.value || null,
     })
     showChainModal.value = false
     chainTitle.value = ''
     chainFirstBody.value = ''
+    chainDeadline.value = ''
     await loadMessages()
   } catch (e: any) { alert(e.message || '发起失败') }
   finally { chainSubmitting.value = false }
@@ -404,6 +414,10 @@ function formatDate(iso: string): string {
             <div v-if="expandedChainId === msg.refId" class="expand-panel" @click.stop>
               <div v-if="!chainDetail" class="expand-loading">加载中...</div>
               <template v-else>
+                <div v-if="chainDetail.deadline" class="battle-meta">
+                  <span>截止: {{ formatDate(chainDetail.deadline) }}</span>
+                  <span v-if="isExpired(chainDetail.deadline)" class="expired-tag">活动已截止</span>
+                </div>
                 <h4 class="expand-title">{{ chainDetail.title }}</h4>
                 <div class="chain-timeline">
                   <div v-for="(seg, si) in chainDetail.segments || []" :key="seg.id" class="chain-segment">
@@ -417,12 +431,13 @@ function formatDate(iso: string): string {
                     </div>
                   </div>
                 </div>
-                <div class="chain-input-row">
+                <div v-if="!isExpired(chainDetail.deadline)" class="chain-input-row">
                   <textarea v-model="chainSegmentText" class="chain-textarea" rows="3" placeholder="接着写下去..."></textarea>
                   <button class="btn-submit-sm" @click="submitChainSegment" :disabled="chainSubmitting || !chainSegmentText.trim()">
                     {{ chainSubmitting ? '提交中...' : '续写' }}
                   </button>
                 </div>
+                <div v-else class="expired-notice">活动日期已截止，无法再续写</div>
               </template>
             </div>
           </div>
@@ -447,12 +462,14 @@ function formatDate(iso: string): string {
                 <div class="battle-meta">
                   <span>状态: <b>{{ battleDetail.status === 'OPEN' ? '开放中' : battleDetail.status === 'VOTING' ? '评审中' : '已关闭' }}</b></span>
                   <span v-if="battleDetail.deadline">截止: {{ formatDate(battleDetail.deadline) }}</span>
+                  <span v-if="isExpired(battleDetail.deadline)" class="expired-tag">活动已截止</span>
                 </div>
 
-                <!-- Participant: can submit -->
-                <div v-if="isBattleParticipant(battleDetail) && battleDetail.status === 'OPEN'" class="battle-actions">
+                <!-- Participant: can submit only if not expired -->
+                <div v-if="isBattleParticipant(battleDetail) && battleDetail.status === 'OPEN' && !isExpired(battleDetail.deadline)" class="battle-actions">
                   <button class="btn-submit-sm" @click="openBattleEntryModal()">提交作品</button>
                 </div>
+                <div v-else-if="isBattleParticipant(battleDetail) && isExpired(battleDetail.deadline)" class="expired-notice">活动日期已截止，无法再提交</div>
 
                 <!-- Entries -->
                 <div v-if="battleDetail.entries && battleDetail.entries.length > 0" class="battle-entries">
@@ -574,6 +591,8 @@ function formatDate(iso: string): string {
         <div class="modal-card"><h3>发起故事接龙</h3>
           <input v-model="chainTitle" class="form-input" placeholder="接龙标题" />
           <textarea v-model="chainFirstBody" class="form-textarea" rows="5" placeholder="写下精彩的开头..."></textarea>
+          <label class="field-label">截止时间 (可选，到期后不可再续写)</label>
+          <input v-model="chainDeadline" type="datetime-local" class="form-input" />
           <div class="modal-actions"><button class="btn-cancel" @click="showChainModal = false">取消</button><button class="btn-submit" @click="createChain" :disabled="chainSubmitting || !chainTitle.trim() || !chainFirstBody.trim()">{{ chainSubmitting ? '发起中...' : '发起接龙' }}</button></div>
         </div>
       </div>
@@ -797,4 +816,22 @@ function formatDate(iso: string): string {
 .score-row { display: flex; align-items: center; gap: 12px; }
 .score-slider { flex: 1; }
 .score-value { font-size: 16px; font-weight: 600; color: #1a73e8; min-width: 60px; }
+
+.expired-tag {
+  color: #d93025;
+  background: #fce8e6;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+}
+.expired-notice {
+  text-align: center;
+  color: #999;
+  font-size: 13px;
+  padding: 12px;
+  background: #f1f3f4;
+  border-radius: 6px;
+  margin-top: 8px;
+}
 </style>

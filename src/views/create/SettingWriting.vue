@@ -123,7 +123,7 @@ onMounted(loadWorlds)
       >
         <div class="card-name">
           {{ w.name }}
-          <span v-if="w.collaborators && w.collaborators.length > 0" class="shared-badge">👥 共创</span>
+          <span v-if="w.collaborators && w.collaborators.length >= 2" class="shared-badge">👥 共创</span>
         </div>
         <div class="card-meta">
           <span v-if="w.type" class="card-type">{{ w.type }}</span>
@@ -132,7 +132,7 @@ onMounted(loadWorlds)
             class="btn-co-create"
             @click="openCollaboratorModal($event, w)"
           >
-            {{ w.collaborators && w.collaborators.length > 0 ? '管理共创' : '共创' }}
+            {{ w.collaborators && w.collaborators.length >= 2 ? '管理共创' : '共创' }}
           </button>
         </div>
         <div class="card-desc">{{ w.description || '暂无简介' }}</div>

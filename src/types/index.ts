@@ -68,6 +68,7 @@ export interface StoryChain {
 // 接龙详情 VO（后端查出来的完整接龙，包含段落列表）
 export interface ChainDetailVO extends StoryChain {
   segments?: ChainSegment[]
+  deadline?: string
 }
 
 // 接龙段落

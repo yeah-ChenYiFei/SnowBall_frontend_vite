@@ -169,6 +169,7 @@ function displayChapter(chapter?: string): string {
               'article-card',
               `card-${card.position}`,
               { 'card-hovered': hoveredCardId === card.article.id },
+              { 'card-dimmed': hoveredCardId !== null && hoveredCardId !== card.article.id },
             ]"
             @click="card.position === 'center' && goToArticle(card.article.id)"
             @mouseenter="hoveredCardId = card.article.id"
@@ -341,6 +342,12 @@ function displayChapter(chapter?: string): string {
 
 .card-hovered.card-center {
   transform: translateX(-50%) translateZ(30px) scale(1.06) !important;
+}
+
+/* Dim all non-hovered cards when any card is hovered */
+.card-dimmed {
+  filter: grayscale(0.6) brightness(0.7) !important;
+  transition: filter 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* Card inner */

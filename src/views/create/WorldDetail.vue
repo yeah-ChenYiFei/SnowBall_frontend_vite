@@ -95,11 +95,37 @@ async function handleSaveWorld() {
 const showEntryModal = ref(false)
 const isSubmitting = ref(false)
 const entryForm = ref({ name: '', type: '', content: '' })
+const showNewEntryTypeInput = ref(false)
+const newEntryType = ref('')
+const showMoreTypes = ref(false)
+
+const MAX_VISIBLE_TYPES = 8
 
 const allTypes = computed(() => {
   const merged = new Set([...DEFAULT_TYPES, ...customTypes.value])
   return Array.from(merged)
 })
+
+const visibleTypes = computed(() => allTypes.value.slice(0, MAX_VISIBLE_TYPES))
+const overflowTypes = computed(() => allTypes.value.slice(MAX_VISIBLE_TYPES))
+
+function startNewEntryType() {
+  newEntryType.value = ''
+  showNewEntryTypeInput.value = true
+}
+
+function confirmNewEntryType() {
+  const t = newEntryType.value.trim()
+  if (t && !allTypes.value.includes(t)) {
+    customTypes.value.push(t)
+    entryForm.value.type = t
+  }
+  showNewEntryTypeInput.value = false
+}
+
+function cancelNewEntryType() {
+  showNewEntryTypeInput.value = false
+}
 
 // ---- 关系区 ----
 const relations = ref<WorldRelation[]>([])
@@ -220,6 +246,8 @@ function onSearch() { loadEntries() }
 
 function openEntryModal() {
   entryForm.value = { name: '', type: '', content: '' }
+  showNewEntryTypeInput.value = false
+  newEntryType.value = ''
   showEntryModal.value = true
 }
 function closeEntryModal() { if (!isSubmitting.value) showEntryModal.value = false }
@@ -227,6 +255,10 @@ function closeEntryModal() { if (!isSubmitting.value) showEntryModal.value = fal
 async function handleCreateEntry() {
   if (!entryForm.value.name.trim() || !entryForm.value.content.trim()) {
     message.value = '设定名称和内容不能为空'
+    return
+  }
+  if (!entryForm.value.type) {
+    message.value = '请选择设定类型'
     return
   }
   isSubmitting.value = true; message.value = ''
@@ -511,12 +543,41 @@ onMounted(() => {
         <div class="filter-row">
           <span class="filter-label">类型</span>
           <div class="type-chips">
-            <button v-for="t in allTypes" :key="t" class="type-chip" :class="{ active: selectedType === t }" @click="selectTypeFilter(t)">{{ t }}</button>
+            <button v-for="t in visibleTypes" :key="t" class="type-chip" :class="{ active: selectedType === t }" @click="selectTypeFilter(t)">{{ t }}</button>
+            <button
+              v-if="overflowTypes.length > 0"
+              class="type-chip type-chip-more"
+              @click="showMoreTypes = true"
+            >
+              更多 ({{ overflowTypes.length }})
+            </button>
+            <button class="type-chip type-chip-add" @click="startNewEntryType(); showMoreTypes = false">+ 添加类型</button>
           </div>
           <div class="search-box">
             <input v-model="searchKeyword" type="text" class="search-input" placeholder="搜索..." @keyup.enter="onSearch" />
           </div>
         </div>
+
+        <!-- More types modal -->
+        <transition name="modal">
+          <div v-if="showMoreTypes" class="modal-overlay" @click.self="showMoreTypes = false">
+            <div class="modal-box modal-sm">
+              <h3 class="modal-title">所有类型</h3>
+              <div class="type-chips type-chips-grid">
+                <button
+                  v-for="t in allTypes"
+                  :key="t"
+                  class="type-chip"
+                  :class="{ active: selectedType === t }"
+                  @click="selectTypeFilter(t); showMoreTypes = false"
+                >{{ t }}</button>
+              </div>
+              <div class="modal-actions">
+                <button class="btn-cancel" @click="showMoreTypes = false">关闭</button>
+              </div>
+            </div>
+          </div>
+        </transition>
         <div v-if="entries.length === 0" class="empty-hint">暂无设定条目</div>
         <div class="entry-list">
           <div v-for="e in entries" :key="e.id" class="entry-row" @click="router.push(`/create/setting/${worldId}/entry/${e.id}`)">
@@ -747,7 +808,27 @@ onMounted(() => {
           <h2 class="modal-title">添加设定</h2>
           <div v-if="message" class="modal-error">{{ message }}</div>
           <div class="form-row"><label class="form-label">设定名称</label><input v-model="entryForm.name" type="text" class="form-input" placeholder="如：主角小明" /></div>
-          <div class="form-row"><label class="form-label">类型</label><select v-model="entryForm.type" class="form-input"><option value="">选择类型</option><option v-for="t in allTypes" :key="t" :value="t">{{ t }}</option></select></div>
+          <div class="form-row">
+            <label class="form-label">类型</label>
+            <div class="type-select-row">
+              <select v-model="entryForm.type" class="form-input form-select-type">
+                <option value="" disabled>选择设定类型</option>
+                <option v-for="t in allTypes" :key="t" :value="t">{{ t }}</option>
+              </select>
+              <button v-if="!showNewEntryTypeInput" type="button" class="btn-new-type" @click="startNewEntryType">+ 添加类型</button>
+            </div>
+            <div v-if="showNewEntryTypeInput" class="new-type-row">
+              <input
+                v-model="newEntryType"
+                type="text"
+                class="form-input form-input-new-type"
+                placeholder="输入新类型名称"
+                @keyup.enter="confirmNewEntryType"
+              />
+              <button type="button" class="btn-confirm-type" @click="confirmNewEntryType">确定</button>
+              <button type="button" class="btn-cancel-type" @click="cancelNewEntryType">取消</button>
+            </div>
+          </div>
           <div class="form-row"><label class="form-label">内容</label><textarea v-model="entryForm.content" class="form-input form-textarea" rows="8" placeholder="详细描述这个设定..."></textarea></div>
           <div class="modal-actions">
             <button class="btn-cancel" @click="closeEntryModal" :disabled="isSubmitting">取消</button>
@@ -906,7 +987,68 @@ onMounted(() => {
 }
 .type-chip:hover { border-color: #1a73e8; color: #1a73e8; }
 .type-chip.active { background: #1a73e8; color: #fff; border-color: #1a73e8; }
+.type-chip-more { color: #1a73e8; font-weight: 500; }
+.type-chip-add { color: #1a73e8; border-style: dashed; }
+.type-chip-add:hover { background: #e8f0fe; border-color: #1a73e8; }
 .search-box { margin-left: auto; }
+
+/* Type chips grid in modal */
+.type-chips-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.modal-sm { width: 380px; }
+
+/* Type select row (for entry modal) */
+.type-select-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.form-select-type { flex: 1; }
+.btn-new-type {
+  padding: 8px 14px;
+  background: #e8f0fe;
+  color: #1a73e8;
+  border: 1px dashed #1a73e8;
+  border-radius: 8px;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s;
+}
+.btn-new-type:hover { background: #d2e3fc; }
+.new-type-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 8px;
+}
+.form-input-new-type { flex: 1; }
+.btn-confirm-type {
+  padding: 8px 14px;
+  background: #1a73e8;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.btn-confirm-type:hover { background: #1557b0; }
+.btn-cancel-type {
+  padding: 8px 14px;
+  background: #fff;
+  color: #5f6368;
+  border: 1px solid #dadce0;
+  border-radius: 8px;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.btn-cancel-type:hover { background: #f8f9fa; }
 .search-input { padding: 6px 12px; border: 1px solid #dadce0; border-radius: 16px; font-size: 13px; outline: none; width: 140px; font-family: inherit; }
 .search-input:focus { border-color: #1a73e8; }
 

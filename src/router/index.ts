@@ -50,7 +50,7 @@ const router = createRouter({
     { path: '/chain/:id', component: ChainDetail },
     { path: '/login', component: Login },
     { path: '/register', component: Register },
-    { path: '/profile/:userId', component: Profile, meta: { requiresAuth: true } },
+    { path: '/profile/:userId', component: Profile },
     { path: '/mine', redirect: (to: any) => `/profile/${to.query.userId || 'self'}` },
     { path: '/books', component: BookManage, meta: { requiresAuth: true } },
     { path: '/friends', component: Friends, meta: { requiresAuth: true } },

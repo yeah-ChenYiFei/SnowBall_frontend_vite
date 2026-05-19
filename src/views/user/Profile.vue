@@ -46,29 +46,20 @@ async function loadProfile() {
   }
   isLoading.value = true
   try {
-    // Use existing endpoints — load in parallel
-    const [profileRes, articlesRes, worldsRes, inspirationsRes] = await Promise.all([
-      http.get(`/users/${id}/profile`).catch(() => ({ data: null })),
-      http.get('/articles', { params: { userId: id } }).catch(() => ({ data: [] })),
-      http.get('/worlds').catch(() => ({ data: [] })),
-      http.get('/inspirations').catch(() => ({ data: [] })),
-    ])
+    // Only use the known-working /users/:id/profile endpoint.
+    // Other endpoints may not exist yet and could 401 → auto-logout.
+    const res = await http.get(`/users/${id}/profile`)
+    const userData = res.data
 
-    const userData = profileRes.data
-    const allArticles = (articlesRes.data || []) as any[]
-    const allWorlds = (worldsRes.data || []) as any[]
-    const allInspirations = (inspirationsRes.data || []) as any[]
+    const posts: any[] = userData?.posts || []
+    const books: any[] = userData?.books || []
 
-    // Build recent projects from posts + articles
-    const posts = (userData?.posts || []) as any[]
-    const recentProjects: RecentProject[] = [
-      ...posts.map((p: any) => ({ id: p.id, type: p.type, title: p.title, content: p.body || '', createdAt: p.createdAt })),
-      ...allArticles.map((a: any) => ({ id: a.id, type: a.type, title: a.title, content: a.body || '', createdAt: a.createdAt })),
-      ...allWorlds.filter((w: any) => w.userId === id).map((w: any) => ({ id: w.id, type: 'WORLD', title: w.name, content: w.description || '', createdAt: w.createdAt })),
-      ...allInspirations.filter((i: any) => i.userId === id).map((i: any) => ({ id: i.id, type: 'INSPIRATION', title: '灵感记录', content: i.content || '', createdAt: i.createdAt })),
-    ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    // Build recent projects from posts only (safe data source)
+    const recentProjects: RecentProject[] = posts
+      .map((p: any) => ({ id: p.id, type: p.type, title: p.title, content: p.body || '', createdAt: p.createdAt }))
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
 
-    // Build contribution data from all items
+    // Build contribution data from posts
     const contribMap = new Map<string, ContributionDay>()
     const addContrib = (date: string, item: { id: number; type: string; title: string }) => {
       const d = date.slice(0, 10)
@@ -78,21 +69,26 @@ async function loadProfile() {
       if (entry.items.length < 5) entry.items.push(item)
     }
     posts.forEach((p: any) => addContrib(p.createdAt, { id: p.id, type: p.type, title: p.title }))
-    allArticles.forEach((a: any) => addContrib(a.createdAt, { id: a.id, type: a.type, title: a.title }))
-    allWorlds.filter((w: any) => w.userId === id).forEach((w: any) => addContrib(w.createdAt, { id: w.id, type: 'WORLD', title: w.name }))
-    allInspirations.forEach((i: any) => addContrib(i.createdAt, { id: i.id, type: 'INSPIRATION', title: i.content?.slice(0, 20) || '灵感' }))
+
+    // Load browsing history from localStorage
+    let browsingHistory: BrowsingHistory[] = []
+    try {
+      const stored = localStorage.getItem(`browseHistory_${id}`)
+      if (stored) browsingHistory = JSON.parse(stored) as BrowsingHistory[]
+      browsingHistory.sort((a, b) => new Date(b.viewedAt).getTime() - new Date(a.viewedAt).getTime())
+    } catch { /* */ }
 
     profile.value = {
       user: { ...userData?.user, signature: userData?.user?.signature || '' },
       recentProjects,
       contributions: Array.from(contribMap.values()).sort((a, b) => a.date.localeCompare(b.date)),
-      browsingHistory: [],
+      browsingHistory,
       activities: [],
       stats: {
         posts: posts.length,
-        worlds: allWorlds.filter((w: any) => w.userId === id).length,
-        articles: allArticles.length,
-        inspirations: allInspirations.length,
+        worlds: 0,
+        articles: 0,
+        inspirations: 0,
       },
     }
   } catch {
@@ -135,15 +131,23 @@ function goToActivity(a: Activity) {
 }
 
 // Contribution graph
+const DAY_LABELS = ['一', '二', '三', '四', '五', '六', '日']
+const MONTH_LABELS = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月']
+
 const contributionWeeks = computed(() => {
   if (!profile.value) return []
   const days = profile.value.contributions
-  if (days.length === 0) return []
-  // Build 52 weeks (plus current) from today back
+  // Build 52 weeks back from today
   const today = new Date()
-  const startDate = new Date(today)
-  startDate.setDate(startDate.getDate() - 365 + (7 - startDate.getDay()))
-  startDate.setHours(0, 0, 0, 0)
+  today.setHours(0, 0, 0, 0)
+  // Find the most recent Sunday as end, go back ~52 weeks
+  const endDate = new Date(today)
+  const startDate = new Date(endDate)
+  startDate.setDate(startDate.getDate() - 364) // 52*7 = 364
+  // Align start to Monday
+  const dayOfWeek = startDate.getDay()
+  const offset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek
+  startDate.setDate(startDate.getDate() + offset)
 
   const dayMap = new Map<string, ContributionDay>()
   days.forEach(d => dayMap.set(d.date, d))
@@ -166,8 +170,34 @@ const contributionWeeks = computed(() => {
   return weeks
 })
 
+// Compute which weeks start a new month
+const monthLabels = computed(() => {
+  const weeks = contributionWeeks.value
+  if (weeks.length === 0) return []
+  const labels: { idx: number; label: string }[] = []
+  // Walk through week 0, day 0 to find date
+  const today = new Date()
+  const startDate = new Date(today)
+  startDate.setDate(startDate.getDate() - 364)
+  const dow = startDate.getDay()
+  const offset = dow === 0 ? -6 : 1 - dow
+  startDate.setDate(startDate.getDate() + offset)
+  let d = new Date(startDate)
+  let lastMonth = -1
+  for (let wi = 0; wi < weeks.length; wi++) {
+    const firstDayDate = new Date(d)
+    const month = firstDayDate.getMonth()
+    if (month !== lastMonth) {
+      labels.push({ idx: wi, label: MONTH_LABELS[month] })
+      lastMonth = month
+    }
+    d.setDate(d.getDate() + 7)
+  }
+  return labels
+})
+
 function dayColor(day: ContributionDay | null): string {
-  if (!day || day.count === 0) return '#ebedf0'
+  if (!day || day.count === 0) return '#ffffff'
   if (day.count <= 2) return '#9be9a8'
   if (day.count <= 4) return '#40c463'
   if (day.count <= 7) return '#30a14e'
@@ -264,20 +294,37 @@ watch(() => route.params.userId, loadProfile)
         <!-- Contribution Graph -->
         <section class="section-card">
           <h3>创作热力图</h3>
-          <div class="contrib-container">
-            <div v-if="contributionWeeks.length === 0" class="empty-hint">暂无创作记录</div>
-            <div v-else class="contrib-graph" @mouseleave="onDayLeave">
-              <div v-for="(week, wi) in contributionWeeks" :key="wi" class="contrib-week">
-                <div
-                  v-for="(day, di) in week"
-                  :key="di"
-                  class="contrib-day"
-                  :class="{ 'day-null': day === null }"
-                  :style="{ backgroundColor: dayColor(day) }"
-                  @mouseenter="onDayEnter($event, day)"
-                  @mouseleave="onDayLeave"
-                  @click="onDayClick(day)"
-                />
+          <div class="contrib-wrapper" v-if="contributionWeeks.length > 0">
+            <!-- Month labels row -->
+            <div class="contrib-month-row">
+              <div class="contrib-day-label-spacer"></div>
+              <div class="contrib-month-labels">
+                <span
+                  v-for="(ml, mli) in monthLabels"
+                  :key="mli"
+                  class="contrib-month-label"
+                  :style="{ gridColumn: ml.idx + 1 }"
+                >{{ ml.label }}</span>
+              </div>
+            </div>
+            <!-- Graph body: day labels + grid -->
+            <div class="contrib-body" @mouseleave="onDayLeave">
+              <div class="contrib-day-labels">
+                <span v-for="(dl, dli) in DAY_LABELS" :key="dli" class="contrib-day-label">{{ dl }}</span>
+              </div>
+              <div class="contrib-grid">
+                <div v-for="(week, wi) in contributionWeeks" :key="wi" class="contrib-week">
+                  <div
+                    v-for="(day, di) in week"
+                    :key="di"
+                    class="contrib-day"
+                    :class="{ 'day-null': day === null, 'day-empty': day && day.count === 0 }"
+                    :style="{ backgroundColor: dayColor(day) }"
+                    @mouseenter="onDayEnter($event, day)"
+                    @mouseleave="onDayLeave"
+                    @click="onDayClick(day)"
+                  />
+                </div>
               </div>
             </div>
             <!-- Tooltip -->
@@ -295,9 +342,10 @@ watch(() => route.params.userId, loadProfile)
               </div>
             </div>
           </div>
+          <div v-else class="empty-hint">暂无创作记录</div>
           <div class="contrib-legend">
             <span>少</span>
-            <span class="legend-block" style="background:#ebedf0"></span>
+            <span class="legend-block" style="background:#ffffff;border:1px solid #d0d7de"></span>
             <span class="legend-block" style="background:#9be9a8"></span>
             <span class="legend-block" style="background:#40c463"></span>
             <span class="legend-block" style="background:#30a14e"></span>
@@ -562,16 +610,60 @@ watch(() => route.params.userId, loadProfile)
 }
 
 /* Contribution Graph */
-.contrib-container {
+.contrib-wrapper {
   position: relative;
   overflow-x: auto;
-  padding-bottom: 4px;
 }
 
-.contrib-graph {
+.contrib-month-row {
+  display: flex;
+  margin-bottom: 4px;
+}
+
+.contrib-day-label-spacer {
+  width: 28px;
+  flex-shrink: 0;
+}
+
+.contrib-month-labels {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 15px;
+  gap: 3px;
+  position: relative;
+}
+
+.contrib-month-label {
+  font-size: 10px;
+  color: #999;
+  white-space: nowrap;
+}
+
+.contrib-body {
+  display: flex;
+}
+
+.contrib-day-labels {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-right: 6px;
+  flex-shrink: 0;
+}
+
+.contrib-day-label {
+  width: 28px;
+  height: 15px;
+  font-size: 10px;
+  color: #999;
+  line-height: 15px;
+  text-align: right;
+  padding-right: 4px;
+}
+
+.contrib-grid {
   display: flex;
   gap: 3px;
-  min-width: fit-content;
 }
 
 .contrib-week {
@@ -581,18 +673,24 @@ watch(() => route.params.userId, loadProfile)
 }
 
 .contrib-day {
-  width: 14px;
-  height: 14px;
+  width: 15px;
+  height: 15px;
   border-radius: 2px;
   cursor: pointer;
   transition: outline 0.1s;
+  border: 1px solid rgba(27,31,35,0.06);
+  box-sizing: border-box;
 }
 .contrib-day:not(.day-null):hover {
   outline: 2px solid #1a73e8;
-  outline-offset: 1px;
+  outline-offset: -1px;
 }
 .contrib-day.day-null {
   visibility: hidden;
+}
+.contrib-day.day-empty {
+  background: #ffffff !important;
+  border: 1px solid #ebedf0;
 }
 
 .contrib-tooltip {

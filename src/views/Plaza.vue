@@ -242,6 +242,7 @@ onMounted(() => {
       source="POST"
       :trigger-el="hoverEl"
       @close="showHoverMenu = false"
+      @cancelClose="if (hoverTimer) { clearTimeout(hoverTimer); hoverTimer = null }"
     />
   </div>
 </template>
