@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useFriendStore } from '@/stores/friend'
 
@@ -10,21 +10,24 @@ const router = useRouter()
 const friendStore = useFriendStore()
 const tab = ref<'friends' | 'pending'>('friends')
 
-if (props.show) {
-  friendStore.init()
-}
+watch(() => props.show, (val) => {
+  if (val) {
+    tab.value = 'friends'
+    friendStore.init()
+  }
+})
 
 function goToProfile(userId: number) {
   emit('close')
   router.push(`/mine?userId=${userId}`)
 }
 
-async function handleAccept(id: number) {
-  await friendStore.acceptRequest(id)
+async function handleAccept(friend: { id?: number; userId: number }) {
+  await friendStore.acceptRequest(friend.id || friend.userId)
 }
 
-async function handleReject(id: number) {
-  await friendStore.rejectRequest(id)
+async function handleReject(friend: { id?: number; userId: number }) {
+  await friendStore.rejectRequest(friend.id || friend.userId)
 }
 </script>
 
@@ -84,8 +87,8 @@ async function handleReject(id: number) {
             <div class="friend-avatar">{{ f.username?.charAt(0) || '?' }}</div>
             <span class="friend-name">{{ f.username }}</span>
             <div class="request-actions">
-              <button class="btn-accept" @click="handleAccept(f.userId)">同意</button>
-              <button class="btn-reject" @click="handleReject(f.userId)">拒绝</button>
+              <button class="btn-accept" @click="handleAccept(f)">同意</button>
+              <button class="btn-reject" @click="handleReject(f)">拒绝</button>
             </div>
           </div>
         </div>

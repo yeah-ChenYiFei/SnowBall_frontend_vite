@@ -35,7 +35,27 @@ const form = ref({
   isPublic: true,
 })
 
-const typeOptions = ['奇幻', '科幻', '都市', '古风', '末世', '架空历史', '其他']
+const typeOptions = ref(['奇幻', '科幻', '都市', '古风', '末世', '架空历史', '其他'])
+const newType = ref('')
+const showNewTypeInput = ref(false)
+
+function startNewType() {
+  newType.value = ''
+  showNewTypeInput.value = true
+}
+
+function confirmNewType() {
+  const t = newType.value.trim()
+  if (t && !typeOptions.value.includes(t)) {
+    typeOptions.value.push(t)
+    form.value.type = t
+  }
+  showNewTypeInput.value = false
+}
+
+function cancelNewType() {
+  showNewTypeInput.value = false
+}
 
 async function loadWorlds() {
   try {
@@ -48,6 +68,8 @@ async function loadWorlds() {
 
 function openModal() {
   form.value = { name: '', description: '', type: '', isPublic: false }
+  showNewTypeInput.value = false
+  newType.value = ''
   showModal.value = true
 }
 
@@ -59,6 +81,10 @@ function closeModal() {
 async function handleCreate() {
   if (!form.value.name.trim()) {
     message.value = '世界名称不能为空'
+    return
+  }
+  if (!form.value.type) {
+    message.value = '请选择世界观类型'
     return
   }
   isSubmitting.value = true
@@ -97,7 +123,7 @@ onMounted(loadWorlds)
       >
         <div class="card-name">
           {{ w.name }}
-          <span v-if="w.isCollaborator && !w.isOwner" class="shared-badge">👥 共创</span>
+          <span v-if="w.collaborators && w.collaborators.length > 0" class="shared-badge">👥 共创</span>
         </div>
         <div class="card-meta">
           <span v-if="w.type" class="card-type">{{ w.type }}</span>
@@ -106,7 +132,7 @@ onMounted(loadWorlds)
             class="btn-co-create"
             @click="openCollaboratorModal($event, w)"
           >
-            共创
+            {{ w.collaborators && w.collaborators.length > 0 ? '管理共创' : '共创' }}
           </button>
         </div>
         <div class="card-desc">{{ w.description || '暂无简介' }}</div>
@@ -134,10 +160,31 @@ onMounted(loadWorlds)
 
           <div class="form-row">
             <label class="form-label">类型</label>
-            <select v-model="form.type" class="form-input">
-              <option value="" disabled>选择世界观类型</option>
-              <option v-for="t in typeOptions" :key="t" :value="t">{{ t }}</option>
-            </select>
+            <div class="type-select-row">
+              <select v-model="form.type" class="form-input form-select-type">
+                <option value="" disabled>选择世界观类型</option>
+                <option v-for="t in typeOptions" :key="t" :value="t">{{ t }}</option>
+              </select>
+              <button
+                v-if="!showNewTypeInput"
+                type="button"
+                class="btn-new-type"
+                @click="startNewType"
+              >
+                + 添加新类型
+              </button>
+            </div>
+            <div v-if="showNewTypeInput" class="new-type-row">
+              <input
+                v-model="newType"
+                type="text"
+                class="form-input form-input-new-type"
+                placeholder="输入新类型名称"
+                @keyup.enter="confirmNewType"
+              />
+              <button type="button" class="btn-confirm-type" @click="confirmNewType">确定</button>
+              <button type="button" class="btn-cancel-type" @click="cancelNewType">取消</button>
+            </div>
           </div>
 
           <div class="form-row">
@@ -380,6 +427,66 @@ onMounted(loadWorlds)
 .form-textarea {
   resize: vertical;
 }
+
+.type-select-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.form-select-type {
+  flex: 1;
+}
+
+.btn-new-type {
+  padding: 8px 14px;
+  background: #e8f0fe;
+  color: #1a73e8;
+  border: 1px dashed #1a73e8;
+  border-radius: 8px;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s;
+}
+.btn-new-type:hover {
+  background: #d2e3fc;
+}
+
+.new-type-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 8px;
+}
+
+.form-input-new-type {
+  flex: 1;
+}
+
+.btn-confirm-type {
+  padding: 8px 14px;
+  background: #1a73e8;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.btn-confirm-type:hover { background: #1557b0; }
+
+.btn-cancel-type {
+  padding: 8px 14px;
+  background: #fff;
+  color: #5f6368;
+  border: 1px solid #dadce0;
+  border-radius: 8px;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.btn-cancel-type:hover { background: #f8f9fa; }
 
 .form-row-inline {
   display: flex;

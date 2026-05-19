@@ -41,7 +41,9 @@ const loadPosts = async () => {
   isLoadingPosts.value = true
   try {
     const res = await http.get('/posts')
-    posts.value = res.data || []
+    posts.value = (res.data || []).sort((a: Post, b: Post) =>
+      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    )
   } catch {
     // silent
   } finally {
@@ -109,17 +111,9 @@ const handleReact = async (post: Post, type: 'LIKE' | 'DISLIKE', event: Event) =
       if (type === 'LIKE') post.likeCount = (post.likeCount || 0) + 1
       else post.dislikeCount = (post.dislikeCount || 0) + 1
     }
-    posts.value.sort((a, b) => calcScore(b) - calcScore(a))
   } catch {
     // silent
   }
-}
-
-const calcScore = (post: Post) => {
-  const net = (post.likeCount || 0) - (post.dislikeCount || 0)
-  if (net <= 0) return 0
-  const hours = (Date.now() - new Date(post.createdAt).getTime()) / 3600000 + 2
-  return net / Math.pow(hours, 1.5)
 }
 
 const typeMap: Record<string, string> = {

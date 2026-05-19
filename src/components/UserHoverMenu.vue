@@ -21,17 +21,20 @@ const userStore = useUserStore()
 
 const status = ref<FriendshipStatus>({ status: 'NONE' })
 const username = ref('')
+const loaded = ref(false)
 const rect = props.triggerEl.getBoundingClientRect()
 
 const posX = ref(Math.min(rect.left, window.innerWidth - 220))
 const posY = ref(rect.bottom + 4)
 
 onMounted(async () => {
-  status.value = await friendStore.checkStatus(props.userId)
-  try {
-    const res = await http.get(`/users/${props.userId}/profile`)
-    username.value = res.data?.user?.username || ''
-  } catch { /* */ }
+  const [s, u] = await Promise.all([
+    friendStore.checkStatus(props.userId),
+    http.get(`/users/${props.userId}/profile`).then(r => r.data?.user?.username || '').catch(() => '')
+  ])
+  status.value = s
+  username.value = u
+  loaded.value = true
 })
 
 function goToProfile() {
@@ -58,47 +61,50 @@ const isSelf = () => userStore.userInfo?.id === props.userId
       class="hover-menu"
       :style="{ left: posX + 'px', top: posY + 'px' }"
     >
-      <div class="hover-user-info">
-        <div class="hover-avatar">{{ username.charAt(0) || '?' }}</div>
-        <span class="hover-username">{{ username || '用户' + userId }}</span>
-      </div>
-      <div class="hover-actions">
-        <button
-          v-if="!isSelf()"
-          class="hover-action-btn"
-          @click="goToChat"
-        >
-          💬 私聊
-        </button>
-        <button
-          v-if="!isSelf() && status.status === 'NONE'"
-          class="hover-action-btn"
-          @click="handleAddFriend"
-        >
-          ➕ 加好友
-        </button>
-        <span
-          v-else-if="!isSelf() && status.status === 'FRIEND'"
-          class="hover-badge friend-badge"
-        >
-          ✅ 好友
-        </span>
-        <span
-          v-else-if="!isSelf() && status.status === 'PENDING_TO_THEM'"
-          class="hover-badge pending-badge"
-        >
-          ⏳ 已申请
-        </span>
-        <span
-          v-else-if="!isSelf() && status.status === 'PENDING_FROM_THEM'"
-          class="hover-badge pending-badge"
-        >
-          📩 待回复
-        </span>
-        <button class="hover-action-btn" @click="goToProfile">
-          👤 个人主页
-        </button>
-      </div>
+      <div v-if="!loaded" class="hover-loading">加载中...</div>
+      <template v-else>
+        <div class="hover-user-info">
+          <div class="hover-avatar">{{ username.charAt(0) || '?' }}</div>
+          <span class="hover-username">{{ username || '用户' + userId }}</span>
+        </div>
+        <div class="hover-actions">
+          <button
+            v-if="!isSelf()"
+            class="hover-action-btn"
+            @click="goToChat"
+          >
+            💬 私聊
+          </button>
+          <button
+            v-if="!isSelf() && status.status === 'NONE'"
+            class="hover-action-btn"
+            @click="handleAddFriend"
+          >
+            ➕ 加好友
+          </button>
+          <span
+            v-else-if="!isSelf() && status.status === 'FRIEND'"
+            class="hover-badge friend-badge"
+          >
+            ✅ 好友
+          </span>
+          <span
+            v-else-if="!isSelf() && status.status === 'PENDING_TO_THEM'"
+            class="hover-badge pending-badge"
+          >
+            ⏳ 已申请
+          </span>
+          <span
+            v-else-if="!isSelf() && status.status === 'PENDING_FROM_THEM'"
+            class="hover-badge pending-badge"
+          >
+            📩 待回复
+          </span>
+          <button class="hover-action-btn" @click="goToProfile">
+            👤 个人主页
+          </button>
+        </div>
+      </template>
     </div>
   </div>
 </template>
@@ -159,6 +165,12 @@ const isSelf = () => userStore.userInfo?.id === props.userId
 .hover-action-btn:hover {
   background: #e8f0fe;
   color: #1a73e8;
+}
+.hover-loading {
+  text-align: center;
+  color: #999;
+  font-size: 13px;
+  padding: 8px 0;
 }
 .hover-badge {
   padding: 8px 12px;

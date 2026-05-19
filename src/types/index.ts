@@ -288,6 +288,7 @@ export interface Article {
 
 // ===== 好友 =====
 export interface Friend {
+  id?: number
   userId: number
   username: string
   avatarUrl?: string

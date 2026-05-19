@@ -72,14 +72,13 @@ function handleLogout() {
 
         <template v-if="userStore.isLogin()">
           <div
-            class="nav-dropdown"
+            class="nav-dropdown nav-link nav-link-dropdown"
+            :class="{ 'is-active': showCreateMenu }"
             @mouseenter="openCreateMenu"
             @mouseleave="scheduleHide"
           >
-            <span class="nav-link nav-link-dropdown" :class="{ 'is-active': showCreateMenu }">
-              创作
-              <span class="arrow" :class="{ 'arrow-open': showCreateMenu }">▾</span>
-            </span>
+            创作
+            <span class="arrow" :class="{ 'arrow-open': showCreateMenu }">▾</span>
             <transition name="dropdown">
               <div v-if="showCreateMenu" class="dropdown-panel"
                    @mouseenter="openCreateMenu"
@@ -198,6 +197,11 @@ function handleLogout() {
   font-weight: 500;
 }
 
+.nav-link-dropdown.is-active {
+  color: #1a73e8;
+  background: #e8f0fe;
+}
+
 /* 用户操作按钮 */
 .user-actions {
   display: flex;
@@ -259,11 +263,11 @@ function handleLogout() {
 /* 下拉菜单 */
 .nav-dropdown {
   position: relative;
-}
-
-.nav-link-dropdown {
   cursor: default;
   user-select: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .arrow {

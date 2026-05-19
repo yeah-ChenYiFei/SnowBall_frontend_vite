@@ -123,6 +123,12 @@ const typeBadgeClass = (type: ArticleType) => ({
   'type-diary': type === 'DIARY',
   'type-novel': type === 'NOVEL',
 })
+
+function displayChapter(chapter?: string): string {
+  if (!chapter) return ''
+  const cleaned = chapter.replace(/\$\$cfg:[^$]*\$\$/g, '').trim()
+  return cleaned && !cleaned.startsWith('$$') ? cleaned : ''
+}
 </script>
 
 <template>
@@ -175,7 +181,7 @@ const typeBadgeClass = (type: ArticleType) => ({
                 </span>
               </div>
               <h3 class="card-title">{{ card.article.title }}</h3>
-              <p v-if="card.article.chapter" class="card-chapter">{{ card.article.chapter }}</p>
+              <p v-if="displayChapter(card.article.chapter)" class="card-chapter">{{ displayChapter(card.article.chapter) }}</p>
               <p class="card-body">
                 {{ card.article.body?.substring(0, 180) }}{{ card.article.body?.length > 180 ? '...' : '' }}
               </p>

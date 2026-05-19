@@ -114,19 +114,19 @@ watch(isReplying, (newVal) => {
 </template>
 
 <style scoped>
-.comment-item { margin-top: 12px; }
-.comment-main { padding: 12px; background: #fff; border-radius: 6px; border: 1px solid #e8eaed; }
-.comment-header { display: flex; gap: 12px; font-size: 13px; color: #999; margin-bottom: 8px; }
-.comment-author { color: #1a73e8; font-weight: 600; }
-.comment-body { margin: 0 0 8px 0; font-size: 15px; line-height: 1.5; color: #333; }
+.comment-item { margin-top: 12px; min-width: 0; }
+.comment-main { padding: 12px; background: #fff; border-radius: 6px; border: 1px solid #e8eaed; overflow: hidden; }
+.comment-header { display: flex; gap: 12px; font-size: 13px; color: #999; margin-bottom: 8px; flex-wrap: wrap; }
+.comment-author { color: #1a73e8; font-weight: 600; white-space: nowrap; }
+.comment-body { margin: 0 0 8px 0; font-size: 15px; line-height: 1.5; color: #333; overflow-wrap: break-word; word-break: break-word; }
 .reply-tag { color: #1a73e8; font-size: 13px; margin-right: 4px; }
-.comment-actions { display: flex; gap: 16px; align-items: center; }
-.btn-like { background: none; border: none; cursor: pointer; font-size: 14px; padding: 2px 4px; border-radius: 4px; }
+.comment-actions { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+.btn-like { background: none; border: none; cursor: pointer; font-size: 14px; padding: 2px 4px; border-radius: 4px; white-space: nowrap; }
 .btn-like:hover { background: #fff0f0; }
 .btn-like.liked { font-weight: 600; }
-.btn-reply { background: none; border: none; color: #999; font-size: 13px; cursor: pointer; padding: 2px 4px; }
+.btn-reply { background: none; border: none; color: #999; font-size: 13px; cursor: pointer; padding: 2px 4px; white-space: nowrap; }
 .btn-reply:hover { color: #1a73e8; }
-.children-thread { margin-left: 20px; padding-left: 16px; border-left: 2px solid #e8eaed; }
+.children-thread { margin-left: 12px; padding-left: 8px; border-left: 2px solid #e8eaed; overflow: hidden; }
 
 .inline-reply-box {
   margin-top: 10px;
