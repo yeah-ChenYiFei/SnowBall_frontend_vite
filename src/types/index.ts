@@ -441,3 +441,79 @@ export interface PostCreateForm {
   type: string
 }
 
+// ===== 大世界 / 文阁 / 绑定类型 =====
+export interface PublicWorld {
+  id: number
+  userId: number
+  name: string
+  description: string
+  type: string
+  isPublic: boolean
+  entryCount: number
+  createdAt: string
+  updatedAt: string
+  isOwner?: boolean
+  isCollaborator?: boolean
+  collaborators?: Collaborator[]
+}
+
+export interface JoinRequest {
+  id: number
+  worldId: number
+  applicantId: number
+  applicantName: string
+  reason: string
+  status: string // PENDING | APPROVED | REJECTED
+  createdAt: string
+}
+
+export interface PublishedArticle {
+  id: number
+  userId: number
+  type: string
+  title: string
+  body: string
+  status: string
+  chapter: string
+  wordCount: number
+  isPublished: boolean
+  publishedAt: string
+  worldId: number | null
+  worldName: string
+  createdAt: string
+  updatedAt: string
+  authorName: string
+}
+
+export interface ArticleFull {
+  id: number
+  userId: number
+  type: string
+  title: string
+  body: string
+  status: string
+  chapter: string
+  wordCount: number
+  isPublished: boolean
+  publishedAt: string | null
+  worldId: number | null
+  worldName: string | null
+  createdAt: string
+  updatedAt: string
+  authorName: string
+}
+
+export interface GenericComment {
+  id: number
+  postId?: number
+  userId: number
+  authorName: string
+  parentId: number | null
+  body: string
+  likeCount: number
+  dislikeCount: number
+  currentUserReaction?: string | null
+  createdAt: string
+  children?: GenericComment[]
+}
+

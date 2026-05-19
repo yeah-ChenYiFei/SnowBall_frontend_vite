@@ -2,7 +2,7 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import http from '@/api/http'
-import type { ArticleType } from '@/types'
+import type { ArticleType, World } from '@/types'
 import { ArticleTypeLabel } from '@/types'
 import {
   type SectionType,
@@ -60,6 +60,50 @@ const lineHeight = ref('1.8')
 const fontFamily = ref('default')
 
 const wordCount = computed(() => content.value.length)
+
+// Publish + bind world
+const isPublished = ref(false)
+const bindWorldId = ref(0)
+const currentWorldId = ref<number | null>(null)
+const accessibleWorlds = ref<World[]>([])
+
+async function loadAccessibleWorlds() {
+  try {
+    const res = await http.get<World[]>('/worlds')
+    accessibleWorlds.value = res.data || []
+  } catch { /* */ }
+}
+
+async function togglePublish() {
+  if (!editId.value) return
+  try {
+    const endpoint = isPublished.value
+      ? `/articles/${editId.value}/unpublish`
+      : `/articles/${editId.value}/publish`
+    const res = await http.post(endpoint)
+    const data = res.data
+    isPublished.value = (data as any).isPublished
+  } catch (e: any) { alert(e.message || '操作失败') }
+}
+
+async function handleBindWorld() {
+  if (!editId.value || !bindWorldId.value) return
+  try {
+    const res = await http.put(`/articles/${editId.value}/bind-world`, { worldId: bindWorldId.value })
+    currentWorldId.value = (res.data as any).worldId
+    alert('绑定成功')
+  } catch (e: any) { alert(e.message || '操作失败') }
+}
+
+async function handleUnbindWorld() {
+  if (!editId.value) return
+  try {
+    const res = await http.delete(`/articles/${editId.value}/bind-world`)
+    currentWorldId.value = null
+    bindWorldId.value = 0
+    alert('已解绑')
+  } catch (e: any) { alert(e.message || '操作失败') }
+}
 
 const showChapter = computed(() => articleType.value === 'NOVEL')
 
@@ -209,6 +253,11 @@ async function loadArticle() {
     } else {
       chapter.value = ch
     }
+
+    // Restore publish/bind state
+    isPublished.value = (data as any).isPublished || false
+    currentWorldId.value = (data as any).worldId || null
+    bindWorldId.value = (data as any).worldId || 0
   } catch (e: any) {
     message.value = e.message || '加载文章失败'
   } finally {
@@ -414,6 +463,7 @@ function goBack() {
 }
 
 onMounted(() => {
+  loadAccessibleWorlds()
   // Support ?type=DIARY etc. for direct entry from plaza
   const qType = route.query.type as string | undefined
   if (qType && ['ESSAY', 'DIARY', 'NOVEL'].includes(qType) && !isEditMode.value) {
@@ -664,6 +714,24 @@ const textareaStyle = computed(() => ({
           <button class="btn-save" @click="handleSave" :disabled="isSubmitting">
             {{ isSubmitting ? '保存中...' : '保存文章' }}
           </button>
+          <!-- Publish / Bind controls only in edit mode for essay/novel -->
+          <template v-if="isEditMode && (articleType === 'NOVEL' || articleType === 'ESSAY')">
+            <button
+              class="btn-publish-article"
+              :class="{ published: isPublished }"
+              @click="togglePublish"
+            >
+              {{ isPublished ? '取消发布' : '发布到文阁' }}
+            </button>
+            <div class="bind-world-row">
+              <select v-model="bindWorldId" class="bind-select">
+                <option :value="0">绑定世界（可选）</option>
+                <option v-for="w in accessibleWorlds" :key="w.id" :value="w.id">{{ w.name }}</option>
+              </select>
+              <button class="btn-bind" @click="handleBindWorld" :disabled="bindWorldId === 0">绑定</button>
+              <button v-if="currentWorldId" class="btn-unbind" @click="handleUnbindWorld">解绑</button>
+            </div>
+          </template>
         </div>
       </template>
     </template>
@@ -916,7 +984,10 @@ const textareaStyle = computed(() => ({
 .editor-footer {
   display: flex;
   justify-content: center;
+  align-items: center;
+  gap: 16px;
   margin-top: 28px;
+  flex-wrap: wrap;
 }
 
 .btn-save {
@@ -943,6 +1014,30 @@ const textareaStyle = computed(() => ({
   cursor: not-allowed;
   box-shadow: none;
 }
+
+.btn-publish-article {
+  padding: 10px 20px; border: 1px solid #1a73e8; background: #fff;
+  color: #1a73e8; border-radius: 8px; font-size: 14px; cursor: pointer;
+  transition: all 0.15s;
+}
+.btn-publish-article:hover { background: #e8f0fe; }
+.btn-publish-article.published { background: #e6f4ea; color: #137333; border-color: #ceead6; }
+
+.bind-world-row { display: flex; align-items: center; gap: 8px; }
+.bind-select {
+  padding: 8px 12px; border: 1px solid #dadce0; border-radius: 8px;
+  font-size: 13px; outline: none;
+}
+.btn-bind {
+  padding: 8px 14px; background: #1a73e8; color: #fff;
+  border: none; border-radius: 6px; font-size: 13px; cursor: pointer;
+}
+.btn-bind:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-unbind {
+  padding: 8px 14px; background: #fff; color: #d93025;
+  border: 1px solid #f28b82; border-radius: 6px; font-size: 13px; cursor: pointer;
+}
+.btn-unbind:hover { background: #fce8e6; }
 
 .loading-state {
   text-align: center;

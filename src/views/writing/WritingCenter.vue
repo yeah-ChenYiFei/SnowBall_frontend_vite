@@ -129,6 +129,18 @@ function displayChapter(chapter?: string): string {
   const cleaned = chapter.replace(/\$\$cfg:[^$]*\$\$/g, '').trim()
   return cleaned && !cleaned.startsWith('$$') ? cleaned : ''
 }
+
+async function togglePublish(article: Article) {
+  try {
+    const endpoint = (article as any).isPublished
+      ? `/articles/${article.id}/unpublish`
+      : `/articles/${article.id}/publish`
+    const res = await http.post(endpoint)
+    const updated = res.data
+    ;(article as any).isPublished = updated.isPublished
+    ;(article as any).publishedAt = updated.publishedAt
+  } catch (e: any) { alert(e.message || '操作失败') }
+}
 </script>
 
 <template>
@@ -529,4 +541,14 @@ function displayChapter(chapter?: string): string {
 .action-icon {
   font-size: 18px;
 }
+
+.card-publish-row { margin-top: 10px; }
+.btn-publish {
+  width: 100%; padding: 6px 0; border: 1px solid #1a73e8; background: #fff;
+  color: #1a73e8; border-radius: 6px; font-size: 12px; cursor: pointer;
+  transition: all 0.15s;
+}
+.btn-publish:hover { background: #e8f0fe; }
+.btn-publish.published { background: #e6f4ea; color: #137333; border-color: #ceead6; }
+.btn-publish.published:hover { background: #ceead6; }
 </style>

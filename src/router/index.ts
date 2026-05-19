@@ -33,6 +33,10 @@ import WritingDiary from '@/views/writing/WritingDiary.vue'
 import ChatView from '@/views/chat/ChatView.vue'
 import PublicChains from '@/views/wild/PublicChains.vue'
 import PublicChainDetail from '@/views/wild/PublicChainDetail.vue'
+import PublicWorlds from '@/views/wild/PublicWorlds.vue'
+import PublicWorldDetail from '@/views/wild/PublicWorldDetail.vue'
+import PublicLibrary from '@/views/wild/PublicLibrary.vue'
+import ArticleDetail from '@/views/wild/ArticleDetail.vue'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -70,8 +74,10 @@ const router = createRouter({
     // 旷野板块
     { path: '/wild/chains', component: PublicChains },
     { path: '/wild/chains/:chainId', component: PublicChainDetail },
-    { path: '/wild/worlds', component: Plaza }, // 占位，后续替换
-    { path: '/wild/library', component: Plaza }, // 占位，后续替换
+    { path: '/wild/worlds', component: PublicWorlds },
+    { path: '/wild/worlds/:id', component: PublicWorldDetail },
+    { path: '/wild/library', component: PublicLibrary },
+    { path: '/wild/library/:id', component: ArticleDetail },
 
     // ✅ 示例：未来如果你加了后台管理页面，就这样配
     // { path: '/admin', component: () => import('@/views/admin/Dashboard.vue'), meta: { requiresAuth: true, requiredRoles: [ROLES.SYS_ADMIN] } }
@@ -95,7 +101,9 @@ function isPublicPath(path: string): boolean {
   // 旷野公共接龙
   if (/^\/wild\/chains\/\d+$/.test(path)) return true
   if (path === '/wild/chains') return true
+  if (/^\/wild\/worlds\/\d+$/.test(path)) return true
   if (path === '/wild/worlds') return true
+  if (/^\/wild\/library\/\d+$/.test(path)) return true
   if (path === '/wild/library') return true
   return false
 }

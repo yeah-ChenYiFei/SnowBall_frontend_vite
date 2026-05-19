@@ -5,6 +5,7 @@ import http from '@/api/http'
 import { useUserStore } from '@/stores/user'
 import type { World, WorldEntry, WorldRelation, Result, Collaborator, WorldChange } from '@/types'
 import WorldCollaboratorModal from '@/components/WorldCollaboratorModal.vue'
+import ToggleSwitch from '@/components/ToggleSwitch.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -514,14 +515,13 @@ onMounted(() => {
           <div class="form-row"><label class="form-label">名称</label><input v-model="editWorldForm.name" type="text" class="form-input" /></div>
           <div class="form-row"><label class="form-label">类型</label><input v-model="editWorldForm.type" type="text" class="form-input" placeholder="如：奇幻、科幻..." /></div>
           <div class="form-row"><label class="form-label">简介</label><textarea v-model="editWorldForm.description" class="form-input form-textarea" rows="3"></textarea></div>
-<!--          <div class="form-row form-row-inline">-->
-<!--            <label class="form-label">公开可见</label>-->
-<!--            <label class="toggle-switch">-->
-<!--              <input v-model="editWorldForm.isPublic" type="checkbox" />-->
-<!--              <span class="toggle-slider"></span>-->
-<!--              <span class="toggle-text">{{ editWorldForm.isPublic ? '所有人可见' : '仅自己可见' }}</span>-->
-<!--            </label>-->
-<!--          </div>-->
+          <div class="form-row form-row-inline" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
+            <label class="form-label" style="margin:0">公开世界</label>
+            <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
+              <ToggleSwitch v-model="editWorldForm.isPublic" />
+              <span style="font-size:13px;color:#5f6368">{{ editWorldForm.isPublic ? '所有人可见' : '仅自己可见' }}</span>
+            </label>
+          </div>
           <div class="modal-actions">
             <button class="btn-cancel" @click="showEditWorldModal = false">取消</button>
             <button class="btn-create" @click="handleSaveWorld" :disabled="editWorldSaving">

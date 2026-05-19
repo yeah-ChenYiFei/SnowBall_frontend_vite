@@ -47,8 +47,8 @@ onUnmounted(() => {
 const wildSubItems = [
   { label: '广场', path: '/', desc: '零散想法与帖子' },
   { label: '接龙', path: '/wild/chains', desc: '公共故事接龙' },
-  { label: '大世界', path: '/wild/worlds', desc: '共创大世界', soon: true },
-  { label: '文阁', path: '/wild/library', desc: '文学藏书阁', soon: true },
+  { label: '大世界', path: '/wild/worlds', desc: '公开世界设定' },
+  { label: '文阁', path: '/wild/library', desc: '已发布的小说散文' },
 ]
 
 const createSubItems = [
@@ -62,24 +62,22 @@ function openWildMenu() {
   showWildMenu.value = true
 }
 function scheduleHideWild() {
-  wildHideTimer = setTimeout(() => { showWildMenu.value = false }, 150)
+  wildHideTimer = setTimeout(() => { showWildMenu.value = false }, 350)
+}
+function scheduleHide() {
+  hideTimer = setTimeout(() => { showCreateMenu.value = false }, 350)
+}
+function scheduleHideMy() {
+  hideMyTimer = setTimeout(() => { showMyMenu.value = false }, 350)
 }
 function openCreateMenu() {
   if (hideTimer) { clearTimeout(hideTimer); hideTimer = null }
   showCreateMenu.value = true
 }
 
-function scheduleHide() {
-  hideTimer = setTimeout(() => { showCreateMenu.value = false }, 150)
-}
-
 function openMyMenu() {
   if (hideMyTimer) { clearTimeout(hideMyTimer); hideMyTimer = null }
   showMyMenu.value = true
-}
-
-function scheduleHideMy() {
-  hideMyTimer = setTimeout(() => { showMyMenu.value = false }, 150)
 }
 
 const fetchFriendUnread = async () => {

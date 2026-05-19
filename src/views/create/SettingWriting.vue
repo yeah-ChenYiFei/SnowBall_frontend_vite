@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import http from '@/api/http'
 import type { World } from '@/types'
 import WorldCollaboratorModal from '@/components/WorldCollaboratorModal.vue'
+import ToggleSwitch from '@/components/ToggleSwitch.vue'
 
 const router = useRouter()
 
@@ -196,15 +197,14 @@ onMounted(loadWorlds)
               placeholder="简单描述这个世界的背景..."
             ></textarea>
           </div>
-<!--创建时是否公开可见-->
-<!--          <div class="form-row form-row-inline">-->
-<!--            <label class="form-label">公开可见</label>-->
-<!--            <label class="toggle-switch">-->
-<!--              <input v-model="form.isPublic" type="checkbox" />-->
-<!--              <span class="toggle-slider"></span>-->
-<!--              <span class="toggle-text">{{ form.isPublic ? '所有人可见' : '仅自己可见' }}</span>-->
-<!--            </label>-->
-<!--          </div>-->
+
+          <div class="form-row form-row-inline" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
+            <label class="form-label" style="margin:0">公开世界</label>
+            <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
+              <ToggleSwitch v-model="form.isPublic" />
+              <span style="font-size:13px;color:#5f6368">{{ form.isPublic ? '所有人可见' : '仅自己可见' }}</span>
+            </label>
+          </div>
 
           <div class="modal-actions">
             <button class="btn-cancel" @click="closeModal" :disabled="isSubmitting">取消</button>
@@ -317,6 +317,21 @@ onMounted(loadWorlds)
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+.card-meta-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+.toggle-label {
+  font-size: 12px;
+  color: #5f6368;
 }
 
 .card-type {
