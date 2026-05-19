@@ -4,6 +4,19 @@ import { useUserStore } from '@/stores/user'
 import router from '@/router'
 import type { Result } from '@/types'
 
+// 公开路径：处于这些路径时 401 不跳转登录页，只静默清除 token
+function isPublicPathFor401(path: string): boolean {
+  const publics = ['/', '/login', '/register', '/explore', '/about', '/wild/chains']
+  if (publics.includes(path)) return true
+  if (/^\/post\/\d+$/.test(path)) return true
+  if (/^\/chain\/\d+$/.test(path)) return true
+  if (/^\/wild\/chains\/\d+$/.test(path)) return true
+  if (/^\/wild\/chains$/.test(path)) return true
+  if (/^\/wild\/worlds/.test(path)) return true
+  if (/^\/wild\/library/.test(path)) return true
+  return false
+}
+
 type HttpInstance = AxiosInstance & {
   get<T = any>(url: string, config?: AxiosRequestConfig): Promise<Result<T>>
   post<T = any>(url: string, data?: any, config?: AxiosRequestConfig): Promise<Result<T>>
@@ -23,6 +36,8 @@ http.interceptors.request.use(config => {
   }
   return config
 })
+
+let isRedirectingToLogin = false
 
 http.interceptors.response.use(
   response => {
@@ -47,11 +62,17 @@ http.interceptors.response.use(
       return Promise.reject(new Error('网络连接异常，请稍后重试'))
     }
 
-    // 原有逻辑：处理有响应体但状态码不对的情况
+    // 处理 401：公开页面不跳转登录，仅静默清除过期 token
     if (error.response.status === 401) {
       const userStore = useUserStore()
+      const hadToken = !!userStore.token
       userStore.logout()
-      router.push('/login')
+      if (hadToken && !isRedirectingToLogin && !isPublicPathFor401(router.currentRoute.value.path)) {
+        isRedirectingToLogin = true
+        router.push('/login').finally(() => {
+          isRedirectingToLogin = false
+        })
+      }
       return Promise.reject(new Error('登录已过期，请重新登录'))
     }
 

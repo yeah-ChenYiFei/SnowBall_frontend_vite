@@ -362,10 +362,12 @@ export interface BrowsingHistory {
 
 export interface Activity {
   id: number
-  type: string // 'CHAIN' | 'BATTLE'
+  type: string // 'CHAIN' | 'BATTLE' | 'PUBLIC_CHAIN'
   title: string
-  groupId: number
-  groupName: string
+  groupId?: number
+  groupName?: string
+  description?: string
+  deadline?: string
   createdAt: string
 }
 
@@ -376,5 +378,66 @@ export interface UserProfileFull {
   browsingHistory: BrowsingHistory[]
   activities: Activity[]
   stats: { posts: number; worlds: number; articles: number; inspirations: number }
+}
+
+// ===== 公共接龙类型 =====
+export interface PublicChain {
+  id: number
+  creatorId: number
+  creatorName: string
+  title: string
+  description: string
+  status: string
+  groupId: number | null
+  deadline: string
+  createdAt: string
+  firstSegmentBody: string
+  segmentCount: number
+}
+
+export interface ChainSegmentFull {
+  id: number
+  userId: number
+  username: string
+  body: string
+  status: string // 'PENDING' | 'APPROVED' | 'REJECTED'
+  prevSegmentId: number | null
+  depth: number
+  commentCount: number
+  createdAt: string
+}
+
+export interface ChainDetailFull {
+  id: number
+  creatorId: number
+  creatorName: string
+  title: string
+  description: string
+  status: string
+  groupId: number | null
+  deadline: string
+  createdAt: string
+  segments: ChainSegmentFull[]
+}
+
+export interface SegmentComment {
+  id: number
+  userId: number
+  username: string
+  body: string
+  createdAt: string
+}
+
+export interface ChainCreateForm {
+  title: string
+  description: string
+  deadline: string
+  firstSegmentBody: string
+}
+
+export interface PostCreateForm {
+  title: string
+  body: string
+  type: string
 }
 

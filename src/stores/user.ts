@@ -27,8 +27,11 @@ export const useUserStore = defineStore('user', () => {
     try {
       const res = await http.get('/auth/me')
       userInfo.value = res.data
-    } catch (error) {
-      logout()
+    } catch (error: any) {
+      // 401 时拦截器已处理登出+跳转，避免重复 logout
+      if (error?.message !== '登录已过期，请重新登录') {
+        logout()
+      }
     }
   }
 

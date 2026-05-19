@@ -7,8 +7,10 @@ import http from '@/api/http'
 const userStore = useUserStore()
 const router = useRouter()
 
+const showWildMenu = ref(false)
 const showCreateMenu = ref(false)
 const showMyMenu = ref(false)
+let wildHideTimer: ReturnType<typeof setTimeout> | null = null
 let hideTimer: ReturnType<typeof setTimeout> | null = null
 let hideMyTimer: ReturnType<typeof setTimeout> | null = null
 const unreadCount = ref(0)
@@ -42,12 +44,26 @@ onUnmounted(() => {
   if (pollTimer) clearInterval(pollTimer)
 })
 
+const wildSubItems = [
+  { label: '广场', path: '/', desc: '零散想法与帖子' },
+  { label: '接龙', path: '/wild/chains', desc: '公共故事接龙' },
+  { label: '大世界', path: '/wild/worlds', desc: '共创大世界', soon: true },
+  { label: '文阁', path: '/wild/library', desc: '文学藏书阁', soon: true },
+]
+
 const createSubItems = [
   { label: '设定编写', path: '/create/setting', desc: '世界观与角色设定' },
   { label: '灵感记录', path: '/create/inspiration', desc: '捕捉创作灵感' },
   { label: '创作中心', path: '/writing', desc: '写作工作台' },
 ]
 
+function openWildMenu() {
+  if (wildHideTimer) { clearTimeout(wildHideTimer); wildHideTimer = null }
+  showWildMenu.value = true
+}
+function scheduleHideWild() {
+  wildHideTimer = setTimeout(() => { showWildMenu.value = false }, 150)
+}
 function openCreateMenu() {
   if (hideTimer) { clearTimeout(hideTimer); hideTimer = null }
   showCreateMenu.value = true
@@ -91,8 +107,35 @@ function handleLogout() {
 
       <!-- 主导航 -->
       <nav class="main-nav">
-        <router-link to="/" class="nav-link">广场</router-link>
-<!--        <router-link to="/explore" class="nav-link">发现</router-link>-->
+        <div
+          class="nav-dropdown nav-link nav-link-dropdown"
+          :class="{ 'is-active': showWildMenu }"
+          @mouseenter="openWildMenu"
+          @mouseleave="scheduleHideWild"
+        >
+          旷野
+          <span class="arrow" :class="{ 'arrow-open': showWildMenu }">▾</span>
+          <transition name="dropdown">
+            <div v-if="showWildMenu" class="dropdown-panel"
+                 @mouseenter="openWildMenu"
+                 @mouseleave="scheduleHideWild">
+              <router-link
+                v-for="item in wildSubItems"
+                :key="item.path"
+                :to="item.path"
+                class="dropdown-item"
+                :class="{ 'item-soon': item.soon }"
+                @click="showWildMenu = false"
+              >
+                <span class="item-label">
+                  {{ item.label }}
+                  <span v-if="item.soon" class="soon-tag">即将开放</span>
+                </span>
+                <span class="item-desc">{{ item.desc }}</span>
+              </router-link>
+            </div>
+          </transition>
+        </div>
 
         <template v-if="userStore.isLogin()">
           <div
@@ -380,6 +423,28 @@ function handleLogout() {
   padding: 1px 6px;
   font-size: 11px;
   font-weight: 600;
+}
+
+.item-soon {
+  opacity: 0.55;
+  pointer-events: none;
+  cursor: not-allowed;
+}
+.soon-tag {
+  font-size: 10px;
+  padding: 1px 6px;
+  background: #fef7e0;
+  color: #e37400;
+  border-radius: 4px;
+  margin-left: 6px;
+  vertical-align: 2px;
+}
+
+/* Active state for wild routes — highlight the 旷野 dropdown */
+.nav-link-dropdown.is-active,
+.nav-link-dropdown:has(.router-link-active) {
+  color: #1a73e8;
+  background: #e8f0fe;
 }
 
 /* Vue transition: dropdown */

@@ -3,7 +3,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import http from '@/api/http'
 import { useUserStore } from '@/stores/user'
-import type { UserProfileFull, ContributionDay, RecentProject, BrowsingHistory, Activity } from '@/types'
+import type { UserProfileFull, ContributionDay, RecentProject, BrowsingHistory, Activity, PublicChain } from '@/types'
 
 const route = useRoute()
 const router = useRouter()
@@ -78,12 +78,28 @@ async function loadProfile() {
       browsingHistory.sort((a, b) => new Date(b.viewedAt).getTime() - new Date(a.viewedAt).getTime())
     } catch { /* */ }
 
+    // Load public chain activities
+    let chainActivities: Activity[] = []
+    try {
+      const chainRes = await http.get<PublicChain[]>(`/users/${id}/chain-activities`)
+      chainActivities = (chainRes.data || []).map((c: PublicChain) => ({
+        id: c.id,
+        type: 'PUBLIC_CHAIN',
+        title: c.title,
+        description: c.description,
+        deadline: c.deadline,
+        createdAt: c.createdAt,
+        groupId: undefined,
+        groupName: undefined,
+      }))
+    } catch { /* ignore */ }
+
     profile.value = {
       user: { ...userData?.user, signature: userData?.user?.signature || '' },
       recentProjects,
       contributions: Array.from(contribMap.values()).sort((a, b) => a.date.localeCompare(b.date)),
       browsingHistory,
-      activities: [],
+      activities: chainActivities,
       stats: {
         posts: posts.length,
         worlds: 0,
@@ -126,7 +142,8 @@ function goToPost(postId: number) {
 }
 
 function goToActivity(a: Activity) {
-  if (a.type === 'CHAIN') router.push(`/chain/${a.id}`)
+  if (a.type === 'PUBLIC_CHAIN') router.push(`/wild/chains/${a.id}`)
+  else if (a.type === 'CHAIN') router.push(`/chain/${a.id}`)
   else router.push(`/groups/${a.groupId}`)
 }
 
@@ -385,12 +402,12 @@ watch(() => route.params.userId, loadProfile)
                 class="activity-item"
                 @click="goToActivity(a)"
               >
-                <span class="activity-icon">{{ a.type === 'CHAIN' ? '🔗' : '⚔️' }}</span>
+                <span class="activity-icon">{{ a.type === 'PUBLIC_CHAIN' ? '📖' : a.type === 'CHAIN' ? '🔗' : '⚔️' }}</span>
                 <div class="activity-info">
                   <span class="activity-title">{{ a.title }}</span>
                   <span class="activity-group">{{ a.groupName }}</span>
                 </div>
-                <span class="activity-type-tag">{{ a.type === 'CHAIN' ? '接龙' : '擂台' }}</span>
+                <span class="activity-type-tag">{{ a.type === 'PUBLIC_CHAIN' ? '公共接龙' : a.type === 'CHAIN' ? '接龙' : '擂台' }}</span>
               </li>
             </ul>
           </section>

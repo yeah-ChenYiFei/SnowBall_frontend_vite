@@ -27,7 +27,8 @@ function onAuthorEnter(e: MouseEvent, userId: number) {
 function onAuthorLeave() { hoverTimer = setTimeout(() => { showHoverMenu.value = false }, 300) }
 
 const typeMap: Record<string, string> = {
-  OC: '原创角色', SETTING: '世界观', FRAGMENT: '小说片段', BOOK_INFO: '书籍信息'
+  OC: '原创角色', SETTING: '世界观', FRAGMENT: '小说片段', BOOK_INFO: '书籍信息',
+  THOUGHT: '散帖', ESSAY: '散文', DIARY: '日记', NOVEL: '小说',
 }
 
 // 计算属性：判断当前登录用户是不是这篇帖子的作者
@@ -131,6 +132,7 @@ onMounted(() => { loadPost() })
           <span class="meta-info">
             <span
               class="author-link"
+              @click.stop="router.push(`/profile/${post.userId}`)"
               @mouseenter.stop="onAuthorEnter($event, post.userId)"
               @mouseleave="onAuthorLeave"
             >👤 {{ post.authorName || '匿名' }}</span>

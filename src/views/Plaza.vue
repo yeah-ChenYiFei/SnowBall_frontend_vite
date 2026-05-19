@@ -5,6 +5,7 @@ import http from '@/api/http'
 import { useUserStore } from '@/stores/user'
 import type { Post, Inspiration } from '@/types'
 import UserHoverMenu from '@/components/UserHoverMenu.vue'
+import CreatePostModal from '@/components/CreatePostModal.vue'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -22,13 +23,12 @@ function onAuthorEnter(e: MouseEvent, userId: number) {
   showHoverMenu.value = true
 }
 function onAuthorLeave() {
-  hoverTimer = setTimeout(() => {
-    showHoverMenu.value = false
-  }, 300)
+  hoverTimer = setTimeout(() => { showHoverMenu.value = false }, 300)
 }
 
 const posts = ref<Post[]>([])
 const isLoadingPosts = ref(false)
+const showCreatePost = ref(false)
 
 const diaryStreak = ref(0)
 const isLoadingStreak = ref(false)
@@ -36,14 +36,16 @@ const isLoadingStreak = ref(false)
 const inspirations = ref<Inspiration[]>([])
 const isLoadingInspirations = ref(false)
 
-// Load posts
+// Load THOUGHT-type posts only
 const loadPosts = async () => {
   isLoadingPosts.value = true
   try {
     const res = await http.get('/posts')
-    posts.value = (res.data || []).sort((a: Post, b: Post) =>
-      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-    )
+    posts.value = (res.data || [])
+      .filter((p: Post) => p.type === 'THOUGHT')
+      .sort((a: Post, b: Post) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      )
   } catch {
     // silent
   } finally {
@@ -79,22 +81,22 @@ const loadInspirations = async () => {
   }
 }
 
-// Go to post detail
 const goToPost = (id: number) => {
   router.push(`/post/${id}`)
 }
 
-// Go to diary writing
 const goToDiary = () => {
   router.push('/writing/new?type=DIARY')
 }
 
-// Go to inspiration writing
 const goToInspiration = () => {
   router.push('/create/inspiration')
 }
 
-// Like/Dislike
+const onPostCreated = (post: Post) => {
+  posts.value.unshift(post)
+}
+
 const handleReact = async (post: Post, type: 'LIKE' | 'DISLIKE', event: Event) => {
   event.preventDefault()
   event.stopPropagation()
@@ -114,10 +116,6 @@ const handleReact = async (post: Post, type: 'LIKE' | 'DISLIKE', event: Event) =
   } catch {
     // silent
   }
-}
-
-const typeMap: Record<string, string> = {
-  OC: '原创角色', SETTING: '世界观', FRAGMENT: '小说片段', BOOK_INFO: '书籍信息'
 }
 
 const formatDate = (iso: string) => {
@@ -140,13 +138,24 @@ onMounted(() => {
     <!-- ===== LEFT: Post Feed (2/3) ===== -->
     <div class="plaza-left">
       <div class="feed-header">
-        <h2 class="feed-title">广场</h2>
+        <div>
+          <h2 class="feed-title">广场</h2>
+          <span class="feed-subtitle">零散想法，随时分享</span>
+        </div>
+        <button
+          v-if="userStore.isLogin()"
+          class="btn-create-post"
+          @click="showCreatePost = true"
+        >
+          ✍️ 发帖
+        </button>
       </div>
 
       <div v-if="isLoadingPosts" class="loading-state">加载中...</div>
 
       <div v-else-if="posts.length === 0" class="empty-state">
-        还没有人发布内容，快来创作第一篇吧！
+        <div class="empty-icon">💭</div>
+        <div class="empty-text">还没有帖子，来发表第一个想法吧</div>
       </div>
 
       <div v-else class="post-feed">
@@ -157,12 +166,11 @@ onMounted(() => {
           @click="goToPost(post.id)"
         >
           <div class="card-meta-top">
-            <span class="type-badge">{{ typeMap[post.type] || post.type }}</span>
             <span class="post-date">{{ formatDate(post.createdAt) }}</span>
           </div>
 
           <h3 class="card-title">{{ post.title }}</h3>
-          <p class="card-content">{{ truncateText(post.body || '', 150) }}</p>
+          <p class="card-content">{{ truncateText(post.body || '', 200) }}</p>
 
           <div class="card-footer">
             <span
@@ -236,6 +244,8 @@ onMounted(() => {
         </button>
       </div>
     </aside>
+
+    <!-- Hover menu -->
     <UserHoverMenu
       v-if="showHoverMenu && hoverEl && hoverUserId"
       :user-id="hoverUserId"
@@ -243,6 +253,13 @@ onMounted(() => {
       :trigger-el="hoverEl"
       @close="showHoverMenu = false"
       @cancelClose="if (hoverTimer) { clearTimeout(hoverTimer); hoverTimer = null }"
+    />
+
+    <!-- Create Post Modal -->
+    <CreatePostModal
+      v-if="showCreatePost"
+      @close="showCreatePost = false"
+      @created="onPostCreated"
     />
   </div>
 </template>
@@ -266,6 +283,9 @@ onMounted(() => {
 
 .feed-header {
   margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
 .feed-title {
@@ -273,6 +293,31 @@ onMounted(() => {
   font-weight: 700;
   color: #202124;
   margin: 0;
+}
+
+.feed-subtitle {
+  font-size: 13px;
+  color: #999;
+  display: block;
+  margin-top: 2px;
+}
+
+.btn-create-post {
+  padding: 10px 22px;
+  background: #1a73e8;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+.btn-create-post:hover {
+  background: #1557b0;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(26,115,232,0.3);
 }
 
 .loading-state {
@@ -288,6 +333,8 @@ onMounted(() => {
   background: #fff;
   border-radius: 12px;
 }
+.empty-icon { font-size: 40px; margin-bottom: 12px; }
+.empty-text { font-size: 14px; }
 
 /* Post Cards */
 .post-feed {
@@ -314,18 +361,9 @@ onMounted(() => {
 
 .card-meta-top {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-end;
   align-items: center;
-  margin-bottom: 10px;
-}
-
-.type-badge {
-  font-size: 12px;
-  padding: 3px 10px;
-  border-radius: 4px;
-  background: #e8f0fe;
-  color: #1a73e8;
-  font-weight: 500;
+  margin-bottom: 6px;
 }
 
 .post-date {
@@ -393,13 +431,11 @@ onMounted(() => {
   background: #f1f3f4;
 }
 
-.stat-btn.active.like-active,
 .stat-btn.active {
   color: #137333;
   background: #e6f4ea;
   border-color: #ceead6;
 }
-
 .stat-btn:last-child.active {
   color: #c5221f;
   background: #fce8e6;
@@ -528,7 +564,7 @@ onMounted(() => {
   background: #e8f0fe;
 }
 
-/* ===== Responsive: stack on narrow screens ===== */
+/* ===== Responsive ===== */
 @media (max-width: 860px) {
   .plaza-layout {
     grid-template-columns: 1fr;

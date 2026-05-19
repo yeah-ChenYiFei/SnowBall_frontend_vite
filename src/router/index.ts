@@ -31,6 +31,8 @@ import WritingEditor from '@/views/writing/WritingEditor.vue'
 import WritingLibrary from '@/views/writing/WritingLibrary.vue'
 import WritingDiary from '@/views/writing/WritingDiary.vue'
 import ChatView from '@/views/chat/ChatView.vue'
+import PublicChains from '@/views/wild/PublicChains.vue'
+import PublicChainDetail from '@/views/wild/PublicChainDetail.vue'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -65,10 +67,38 @@ const router = createRouter({
     { path: '/chat', component: ChatView, meta: { requiresAuth: true } },
     { path: '/chat/:userId', component: ChatView, meta: { requiresAuth: true } },
 
+    // 旷野板块
+    { path: '/wild/chains', component: PublicChains },
+    { path: '/wild/chains/:chainId', component: PublicChainDetail },
+    { path: '/wild/worlds', component: Plaza }, // 占位，后续替换
+    { path: '/wild/library', component: Plaza }, // 占位，后续替换
+
     // ✅ 示例：未来如果你加了后台管理页面，就这样配
     // { path: '/admin', component: () => import('@/views/admin/Dashboard.vue'), meta: { requiresAuth: true, requiredRoles: [ROLES.SYS_ADMIN] } }
   ]
 })
+
+// 无需登录即可访问的公共页面
+const PUBLIC_PATHS = new Set([
+  '/',
+  '/login',
+  '/register',
+  '/explore',
+  '/about',
+])
+
+function isPublicPath(path: string): boolean {
+  if (PUBLIC_PATHS.has(path)) return true
+  // /post/:id 和 /chain/:id 也允许未登录查看
+  if (/^\/post\/\d+$/.test(path)) return true
+  if (/^\/chain\/\d+$/.test(path)) return true
+  // 旷野公共接龙
+  if (/^\/wild\/chains\/\d+$/.test(path)) return true
+  if (path === '/wild/chains') return true
+  if (path === '/wild/worlds') return true
+  if (path === '/wild/library') return true
+  return false
+}
 
 // 全局前置守卫
 router.beforeEach(async (to, from) => {
@@ -77,12 +107,19 @@ router.beforeEach(async (to, from) => {
   // ✅ 必须等待用户信息加载完，否则刷新页面时 userInfo 是空的
   await userStore.waitReady()
 
-  // 1. 基础登录拦截
-  if (to.meta.requiresAuth && !userStore.isLogin()) {
+  const isLoggedIn = userStore.isLogin()
+
+  // 1. 未登录用户只能访问公共页面，避免进入需要 API 调用的页面后 401 闪退回登录
+  if (!isLoggedIn && !isPublicPath(to.path)) {
     return '/login'
   }
 
-  // 2. ✅ 基于角色的路由拦截（读取 meta.requiredRoles）
+  // 2. 基础登录拦截（显式声明 requiresAuth 的页面）
+  if (to.meta.requiresAuth && !isLoggedIn) {
+    return '/login'
+  }
+
+  // 3. ✅ 基于角色的路由拦截（读取 meta.requiredRoles）
   if (to.meta.requiredRoles) {
     const requiredRoles = to.meta.requiredRoles as string[]
     const currentRole = userStore.userInfo?.role

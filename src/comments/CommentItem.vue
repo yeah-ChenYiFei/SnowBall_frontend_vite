@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch, nextTick } from 'vue'
+import { useRouter } from 'vue-router'
 import http from '@/api/http'
 import { useUserStore } from '@/stores/user'
 import type { Comment } from '@/types'
@@ -16,6 +17,7 @@ const emit = defineEmits<{
   (e: 'refresh'): void
 }>()
 
+const router = useRouter()
 const userStore = useUserStore()
 const replyText = ref('')
 const replyRef = ref<HTMLTextAreaElement | null>(null)
@@ -65,7 +67,10 @@ watch(isReplying, (newVal) => {
   <div class="comment-item">
     <div class="comment-main">
       <div class="comment-header">
-        <span class="comment-author">{{ comment.authorName || '匿名用户' }}</span>
+        <span
+          class="comment-author"
+          @click="router.push(`/profile/${comment.userId}`)"
+        >{{ comment.authorName || '匿名用户' }}</span>
         <span class="comment-time">{{ new Date(comment.createdAt).toLocaleString() }}</span>
       </div>
       <p class="comment-body">
@@ -117,7 +122,8 @@ watch(isReplying, (newVal) => {
 .comment-item { margin-top: 12px; min-width: 0; }
 .comment-main { padding: 12px; background: #fff; border-radius: 6px; border: 1px solid #e8eaed; overflow: hidden; }
 .comment-header { display: flex; gap: 12px; font-size: 13px; color: #999; margin-bottom: 8px; flex-wrap: wrap; }
-.comment-author { color: #1a73e8; font-weight: 600; white-space: nowrap; }
+.comment-author { color: #1a73e8; font-weight: 600; white-space: nowrap; cursor: pointer; }
+.comment-author:hover { text-decoration: underline; }
 .comment-body { margin: 0 0 8px 0; font-size: 15px; line-height: 1.5; color: #333; overflow-wrap: break-word; word-break: break-word; }
 .reply-tag { color: #1a73e8; font-size: 13px; margin-right: 4px; }
 .comment-actions { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
