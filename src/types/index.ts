@@ -9,6 +9,14 @@ export interface Result<T = any> {
 }
 
 // 2. 用户模块
+export interface UserInfo {
+  id: number
+  username: string
+  role: string
+  avatarUrl?: string
+  createdAt?: string
+}
+
 export interface User {
   id: number
   username: string

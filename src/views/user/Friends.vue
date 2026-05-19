@@ -52,7 +52,7 @@ async function sendMessage() {
   const body = newMsg.value.trim()
   if (!body || !selectedFriend.value) return
   try {
-    await http.post('/chat/send', { receiverId: selectedFriend.value.userId, body })
+    await http.post(`/chat/${selectedFriend.value.userId}`, { body })
     newMsg.value = ''
     loadMessages(selectedFriend.value.userId)
   } catch (e: any) {

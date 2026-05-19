@@ -47,7 +47,7 @@ const loadPost = async () => {
     post.value = res.data
     // Record browsing history to localStorage
     if (post.value && userStore.userInfo?.id) {
-      const key = `browseHistory_${userStore.userInfo.id}`
+      const key = `browseHistory_${userStore.userInfo?.id}`
       try {
         const stored = localStorage.getItem(key)
         const history: { postId: number; postTitle: string; postType: string; authorName?: string; viewedAt: string }[] = stored ? JSON.parse(stored) : []

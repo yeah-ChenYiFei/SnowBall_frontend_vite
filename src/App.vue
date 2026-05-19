@@ -168,7 +168,7 @@ function handleLogout() {
             @mouseenter="openMyMenu"
             @mouseleave="scheduleHideMy"
           >
-            我的 ({{ userStore.userInfo.username }})
+            我的 ({{ userStore.userInfo?.username || '' }})
             <span class="arrow" :class="{ 'arrow-open': showMyMenu }">▾</span>
             <transition name="dropdown">
               <div v-if="showMyMenu" class="dropdown-panel"

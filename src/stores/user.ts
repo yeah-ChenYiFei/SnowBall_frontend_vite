@@ -1,12 +1,13 @@
 ﻿// src/stores/user.ts
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue' // ✅ 引入 computed
+import { ref, computed } from 'vue'
 import http from '@/api/http'
-import { ROLES } from '@/constants/role' // ✅ 引入常量
+import { ROLES } from '@/constants/role'
+import type { UserInfo } from '@/types'
 
 export const useUserStore = defineStore('user', () => {
   const token = ref(localStorage.getItem('token') || '')
-  const userInfo = ref<any>({ name: '', username: '' })
+  const userInfo = ref<UserInfo | null>(null)
 
   let initPromise: Promise<void> | null = null
 
@@ -37,13 +38,13 @@ export const useUserStore = defineStore('user', () => {
 
   const logout = () => {
     token.value = ''
-    userInfo.value = { name: '', username: '' }
+    userInfo.value = null
     localStorage.removeItem('token')
   }
 
   const isLogin = () => !!token.value
 
-  if (token.value && !userInfo.value.id) {
+  if (token.value && !userInfo.value?.id) {
     initPromise = fetchUserInfo()
   }
 

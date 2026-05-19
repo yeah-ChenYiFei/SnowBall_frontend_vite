@@ -9,7 +9,7 @@ import Plaza from '@/views/Plaza.vue'
 import Create from '@/views/Create.vue'
 import SettingWriting from '@/views/create/SettingWriting.vue'
 import InspirationNote from '@/views/create/InspirationNote.vue'
-import ArticleWriting from '@/views/create/ArticleWriting.vue'
+import PostWriting from '@/views/create/PostWriting.vue'
 import WorldDetail from '@/views/create/WorldDetail.vue'
 import EntryDetail from '@/views/create/EntryDetail.vue'
 import Explore from '@/views/Explore.vue'
@@ -47,7 +47,7 @@ const router = createRouter({
     { path: '/create/setting/:worldId', component: WorldDetail },
     { path: '/create/setting/:worldId/entry/:entryId', component: EntryDetail },
     { path: '/create/inspiration', component: InspirationNote },
-    { path: '/create/article', component: ArticleWriting },
+    { path: '/create/article', component: PostWriting },
     { path: '/explore', component: Explore },
     { path: '/about', component: About },
     { path: '/post/:id', component: PostDetail },

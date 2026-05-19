@@ -95,7 +95,7 @@ function isExpired(deadline: string | null | undefined): boolean {
 }
 
 // ---- Computed ----
-const currentUserId = computed(() => (userStore.userInfo as any)?.id ?? 0)
+const currentUserId = computed(() => userStore.userInfo?.id ?? 0)
 const isGroupAdmin = computed(() => group.value?.creatorId === currentUserId.value)
 
 function isBattleParticipant(battle: WritingBattle | null): boolean {
