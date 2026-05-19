@@ -65,6 +65,7 @@ const wordCount = computed(() => content.value.length)
 const isPublished = ref(false)
 const bindWorldId = ref(0)
 const currentWorldId = ref<number | null>(null)
+const worldName = ref('')
 const accessibleWorlds = ref<World[]>([])
 
 async function loadAccessibleWorlds() {
@@ -90,18 +91,19 @@ async function handleBindWorld() {
   if (!editId.value || !bindWorldId.value) return
   try {
     const res = await http.put(`/articles/${editId.value}/bind-world`, { worldId: bindWorldId.value })
-    currentWorldId.value = (res.data as any).worldId
-    alert('绑定成功')
+    const data = res.data as any
+    currentWorldId.value = data.worldId
+    worldName.value = data.worldName || ''
   } catch (e: any) { alert(e.message || '操作失败') }
 }
 
 async function handleUnbindWorld() {
   if (!editId.value) return
   try {
-    const res = await http.delete(`/articles/${editId.value}/bind-world`)
+    await http.delete(`/articles/${editId.value}/bind-world`)
     currentWorldId.value = null
+    worldName.value = ''
     bindWorldId.value = 0
-    alert('已解绑')
   } catch (e: any) { alert(e.message || '操作失败') }
 }
 
@@ -257,6 +259,7 @@ async function loadArticle() {
     // Restore publish/bind state
     isPublished.value = (data as any).isPublished || false
     currentWorldId.value = (data as any).worldId || null
+    worldName.value = (data as any).worldName || ''
     bindWorldId.value = (data as any).worldId || 0
   } catch (e: any) {
     message.value = e.message || '加载文章失败'
@@ -495,6 +498,14 @@ const textareaStyle = computed(() => ({
         {{ articleType === 'NOVEL' ? (novelPhase === 'create' ? '创建新小说' : '小说写作') : (isEditMode ? '编辑文章' : '新文章') }}
       </h1>
       <div class="header-spacer"></div>
+      <button
+        v-if="isEditMode && (articleType === 'NOVEL' || articleType === 'ESSAY')"
+        class="btn-header-publish"
+        :class="{ published: isPublished }"
+        @click="togglePublish"
+      >
+        {{ isPublished ? '已发布 ✓' : '发布到文阁' }}
+      </button>
     </div>
 
     <div v-if="isLoading" class="loading-state">加载中...</div>
@@ -567,37 +578,59 @@ const textareaStyle = computed(() => ({
             </button>
           </div>
 
-          <!-- Volume selector (only when hasVolumes) -->
-          <div v-if="novelHasVolumes" class="selector-row">
-            <label class="field-label">选择卷</label>
-            <select v-model.number="currentVolume" class="form-select" @change="onVolumeChange()">
-              <option v-for="v in selectableVolumes" :key="v" :value="v">
-                第{{ toChineseNum(v) }}卷
-              </option>
-            </select>
-          </div>
+          <div class="novel-two-col">
+            <!-- Left: chapter selector + title -->
+            <div class="novel-col novel-col-left">
+              <div v-if="novelHasVolumes" class="selector-row">
+                <label class="field-label">选择卷</label>
+                <select v-model.number="currentVolume" class="form-select" @change="onVolumeChange()">
+                  <option v-for="v in selectableVolumes" :key="v" :value="v">
+                    第{{ toChineseNum(v) }}卷
+                  </option>
+                </select>
+              </div>
 
-          <!-- Chapter selector -->
-          <div class="selector-row">
-            <label class="field-label">选择章节</label>
-            <select v-model.number="currentChapter" class="form-select" @change="onChapterChange()">
-              <option v-for="ch in selectableChapters" :key="ch" :value="ch">
-                第{{ toChineseNum(ch) }}章
-                <template v-if="getExistingTitleFor(ch)"> — {{ getExistingTitleFor(ch) }}</template>
-                <template v-else-if="ch > maxChapterInCurrentScope"> (新章节)</template>
-              </option>
-            </select>
-          </div>
+              <div class="selector-row">
+                <label class="field-label">选择章节</label>
+                <select v-model.number="currentChapter" class="form-select" @change="onChapterChange()">
+                  <option v-for="ch in selectableChapters" :key="ch" :value="ch">
+                    第{{ toChineseNum(ch) }}章
+                    <template v-if="getExistingTitleFor(ch)"> — {{ getExistingTitleFor(ch) }}</template>
+                    <template v-else-if="ch > maxChapterInCurrentScope"> (新章节)</template>
+                  </option>
+                </select>
+              </div>
 
-          <!-- Chapter title (auto-generated, editable) -->
-          <div class="chapter-title-field">
-            <label class="field-label">章节标题</label>
-            <input
-              v-model="chapterTitle"
-              type="text"
-              class="form-input"
-              placeholder="可自行修改章节标题"
-            />
+              <div class="chapter-title-field">
+                <label class="field-label">章节标题</label>
+                <input
+                  v-model="chapterTitle"
+                  type="text"
+                  class="form-input"
+                  placeholder="可自行修改章节标题"
+                />
+              </div>
+            </div>
+
+            <!-- Right: bind world info -->
+            <div v-if="isEditMode" class="novel-col novel-col-right">
+              <div class="bound-world-card">
+                <h4>📖 绑定世界</h4>
+                <template v-if="currentWorldId">
+                  <p class="bound-world-name">{{ worldName }}</p>
+                  <a class="bound-world-link" @click.prevent="router.push(`/wild/worlds/${currentWorldId}`)">查看世界 →</a>
+                  <button class="btn-unbind" @click="handleUnbindWorld">解绑</button>
+                </template>
+                <template v-else>
+                  <p class="bound-world-hint">尚未绑定世界</p>
+                  <select v-model="bindWorldId" class="bind-select" style="width:100%;margin-bottom:8px">
+                    <option :value="0">选择世界...</option>
+                    <option v-for="w in accessibleWorlds" :key="w.id" :value="w.id">{{ w.name }}</option>
+                  </select>
+                  <button class="btn-bind" @click="handleBindWorld" :disabled="bindWorldId === 0" style="width:100%">绑定</button>
+                </template>
+              </div>
+            </div>
           </div>
 
           <!-- Writing Toolbar -->
@@ -643,7 +676,6 @@ const textareaStyle = computed(() => ({
             ></textarea>
           </div>
 
-          <!-- Save Button -->
           <div class="editor-footer">
             <button class="btn-save" @click="saveNovelChapter" :disabled="isSubmitting">
               {{ isSubmitting ? '保存中...' : (existingChapterPostId ? '更新章节' : '保存章节') }}
@@ -714,24 +746,15 @@ const textareaStyle = computed(() => ({
           <button class="btn-save" @click="handleSave" :disabled="isSubmitting">
             {{ isSubmitting ? '保存中...' : '保存文章' }}
           </button>
-          <!-- Publish / Bind controls only in edit mode for essay/novel -->
-          <template v-if="isEditMode && (articleType === 'NOVEL' || articleType === 'ESSAY')">
-            <button
-              class="btn-publish-article"
-              :class="{ published: isPublished }"
-              @click="togglePublish"
-            >
-              {{ isPublished ? '取消发布' : '发布到文阁' }}
-            </button>
-            <div class="bind-world-row">
-              <select v-model="bindWorldId" class="bind-select">
-                <option :value="0">绑定世界（可选）</option>
-                <option v-for="w in accessibleWorlds" :key="w.id" :value="w.id">{{ w.name }}</option>
-              </select>
-              <button class="btn-bind" @click="handleBindWorld" :disabled="bindWorldId === 0">绑定</button>
-              <button v-if="currentWorldId" class="btn-unbind" @click="handleUnbindWorld">解绑</button>
-            </div>
-          </template>
+          <!-- Bind world control -->
+          <div v-if="isEditMode && articleType === 'NOVEL'" class="bind-world-row">
+            <select v-model="bindWorldId" class="bind-select">
+              <option :value="0">绑定世界（可选）</option>
+              <option v-for="w in accessibleWorlds" :key="w.id" :value="w.id">{{ w.name }}</option>
+            </select>
+            <button class="btn-bind" @click="handleBindWorld" :disabled="bindWorldId === 0">绑定</button>
+            <button v-if="currentWorldId" class="btn-unbind" @click="handleUnbindWorld">解绑</button>
+          </div>
         </div>
       </template>
     </template>
@@ -778,6 +801,14 @@ const textareaStyle = computed(() => ({
   color: #202124;
   margin: 0;
 }
+
+.btn-header-publish {
+  padding: 8px 18px; border: 1px solid #1a73e8; background: #fff;
+  color: #1a73e8; border-radius: 8px; font-size: 13px; cursor: pointer;
+  white-space: nowrap; transition: all 0.15s;
+}
+.btn-header-publish:hover { background: #e8f0fe; }
+.btn-header-publish.published { background: #e6f4ea; color: #137333; border-color: #ceead6; }
 
 .header-spacer {
   width: 70px;
@@ -1015,14 +1046,6 @@ const textareaStyle = computed(() => ({
   box-shadow: none;
 }
 
-.btn-publish-article {
-  padding: 10px 20px; border: 1px solid #1a73e8; background: #fff;
-  color: #1a73e8; border-radius: 8px; font-size: 14px; cursor: pointer;
-  transition: all 0.15s;
-}
-.btn-publish-article:hover { background: #e8f0fe; }
-.btn-publish-article.published { background: #e6f4ea; color: #137333; border-color: #ceead6; }
-
 .bind-world-row { display: flex; align-items: center; gap: 8px; }
 .bind-select {
   padding: 8px 12px; border: 1px solid #dadce0; border-radius: 8px;
@@ -1194,4 +1217,23 @@ const textareaStyle = computed(() => ({
   color: #5f6368;
   margin-bottom: 6px;
 }
+
+.novel-two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 16px; }
+.novel-col-left .selector-row, .novel-col-left .chapter-title-field { margin-bottom: 14px; }
+.novel-col-left .field-label { display: block; font-size: 13px; font-weight: 500; color: #5f6368; margin-bottom: 6px; }
+.novel-col-left .form-select { width: 100%; padding: 8px 12px; border: 1px solid #dadce0; border-radius: 8px; font-size: 14px; outline: none; }
+
+.bound-world-card { background: #f8f9fa; border-radius: 12px; padding: 20px; border: 1px solid #e8eaed; }
+.bound-world-card h4 { margin: 0 0 12px 0; font-size: 15px; color: #202124; }
+.bound-world-name { font-size: 17px; font-weight: 600; color: #1a73e8; margin: 0 0 8px 0; }
+.bound-world-link { color: #1a73e8; font-size: 13px; cursor: pointer; display: inline-block; margin-bottom: 10px; }
+.bound-world-link:hover { text-decoration: underline; }
+.bound-world-hint { font-size: 13px; color: #999; margin: 0 0 8px 0; }
+.bound-world-card .btn-unbind { display: block; width: 100%; padding: 6px 0; background: #fff; color: #d93025; border: 1px solid #f28b82; border-radius: 6px; cursor: pointer; font-size: 13px; }
+.bound-world-card .btn-unbind:hover { background: #fce8e6; }
+.bound-world-card .btn-bind { padding: 8px 0; background: #1a73e8; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; }
+.bound-world-card .btn-bind:disabled { opacity: 0.5; cursor: not-allowed; }
+.bound-world-card .bind-select { padding: 8px 12px; border: 1px solid #dadce0; border-radius: 6px; font-size: 13px; outline: none; }
+
+@media (max-width: 700px) { .novel-two-col { grid-template-columns: 1fr; } }
 </style>

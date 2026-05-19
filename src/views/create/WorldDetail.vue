@@ -3,7 +3,7 @@ import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import http from '@/api/http'
 import { useUserStore } from '@/stores/user'
-import type { World, WorldEntry, WorldRelation, Result, Collaborator, WorldChange } from '@/types'
+import type { World, WorldEntry, WorldRelation, Result, Collaborator, WorldChange, ArticleFull } from '@/types'
 import WorldCollaboratorModal from '@/components/WorldCollaboratorModal.vue'
 import ToggleSwitch from '@/components/ToggleSwitch.vue'
 
@@ -27,6 +27,14 @@ const showCollaboratorModal = ref(false)
 const collaborators = ref<Collaborator[]>([])
 const changes = ref<WorldChange[]>([])
 const showChangesPanel = ref(false)
+const boundArticles = ref<ArticleFull[]>([])
+
+async function loadBoundArticles() {
+  try {
+    const res = await http.get(`/articles/by-world/${worldId}`)
+    boundArticles.value = (res.data || []) as ArticleFull[]
+  } catch { /* */ }
+}
 
 async function loadCollaborators() {
   try {
@@ -69,6 +77,14 @@ const showEditWorldModal = ref(false)
 const editWorldForm = ref({ name: '', description: '', type: '', isPublic: true })
 const editWorldMsg = ref('')
 const editWorldSaving = ref(false)
+
+async function toggleWorldPublic(v: boolean) {
+  if (!world.value) return
+  try {
+    await http.put(`/worlds/${worldId}`, { isPublic: v })
+    world.value.isPublic = v
+  } catch (e: any) { alert(e.message || '操作失败') }
+}
 
 function openEditWorld() {
   if (!world.value) return
@@ -433,7 +449,7 @@ function onGraphWheel(e: WheelEvent) {
 // ---- 生命周期 ----
 onMounted(() => {
   loadWorld(); loadEntries(); loadTypes(); loadRelations()
-  loadCollaborators(); loadChanges()
+  loadCollaborators(); loadChanges(); loadBoundArticles()
 })
 </script>
 
@@ -443,10 +459,13 @@ onMounted(() => {
     <div class="wd-header">
       <button class="back-btn" @click="router.push('/create/setting')">← 返回</button>
       <div class="wd-info">
-        <h1 class="wd-name">
-          {{ world?.name || '加载中...' }}
-<!--          <span v-if="world && !world.isPublic" class="private-badge">🔒 私有</span>-->
-        </h1>
+        <div class="wd-title-row">
+          <h1 class="wd-name">{{ world?.name || '加载中...' }}</h1>
+          <label v-if="isWorldCreator" class="public-toggle-inline" @click.stop>
+            <span class="public-label">公开</span>
+            <ToggleSwitch :model-value="world?.isPublic ?? false" @update:model-value="toggleWorldPublic" />
+          </label>
+        </div>
         <div class="wd-meta">
           <span v-if="world?.type" class="wd-type-tag">{{ world.type }}</span>
           <span class="wd-desc">{{ world?.description || '暂无简介' }}</span>
@@ -464,13 +483,27 @@ onMounted(() => {
       </div>
     </div>
 
-    <!-- 共创者管理 -->
-    <div v-if="isWorldCreator" class="collab-section">
-      <h3>共创者</h3>
-      <div v-if="collaborators.length === 0" class="empty-hint">暂无共创者</div>
-      <div v-for="c in collaborators" :key="c.userId" class="collab-row">
-        <span>{{ c.username || '用户' + c.userId }}</span>
-        <button class="btn-remove-collab" @click="removeCollaborator(c.userId)">移除</button>
+    <!-- 共创者 + 绑定小说 双栏 -->
+    <div v-if="isWorldCreator" class="world-bottom-cols">
+      <div class="bottom-col bottom-col-left">
+        <h3>👥 共创者</h3>
+        <button v-if="collaborators.length === 0" class="btn-manage-collab-inline" @click="showCollaboratorModal = true">+ 添加</button>
+        <div v-for="c in collaborators" :key="c.userId" class="collab-row">
+          <span>{{ c.username || '用户' + c.userId }}</span>
+          <button class="btn-remove-collab" @click="removeCollaborator(c.userId)">移除</button>
+        </div>
+        <button v-if="collaborators.length > 0" class="btn-manage-collab-inline" @click="showCollaboratorModal = true" style="margin-top:8px">+ 添加共创者</button>
+      </div>
+      <div class="bottom-col bottom-col-right">
+        <h3>📖 绑定小说</h3>
+        <div v-if="boundArticles.length === 0" class="empty-hint">暂无绑定小说</div>
+        <div v-for="a in boundArticles" :key="a.id" class="bound-novel-row" @click="router.push(`/writing/${a.id}`)">
+          <div class="bound-novel-info">
+            <span class="bound-novel-type">{{ a.type === 'NOVEL' ? '小说' : '散文' }}</span>
+            <span class="bound-novel-title">{{ a.title }}</span>
+          </div>
+          <span class="bound-novel-author">{{ a.authorName }}</span>
+        </div>
       </div>
     </div>
 
@@ -921,7 +954,10 @@ onMounted(() => {
 .wd-header { margin-bottom: 24px; }
 .back-btn { background: none; border: none; color: #1a73e8; cursor: pointer; font-size: 14px; padding: 0; margin-bottom: 10px; }
 .back-btn:hover { text-decoration: underline; }
-.wd-name { font-size: 26px; font-weight: 600; color: #202124; margin-bottom: 6px; }
+.wd-title-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.wd-name { font-size: 26px; font-weight: 600; color: #202124; margin: 0; }
+.public-toggle-inline { display: flex; align-items: center; gap: 8px; cursor: pointer; flex-shrink: 0; }
+.public-label { font-size: 13px; color: #5f6368; }
 .wd-meta { display: flex; align-items: center; gap: 10px; }
 .wd-type-tag { font-size: 12px; background: rgba(26,115,232,0.1); color: #1a73e8; padding: 2px 10px; border-radius: 20px; }
 .wd-desc { font-size: 14px; color: #5f6368; }
@@ -1240,4 +1276,19 @@ onMounted(() => {
 .reject-input:focus { border-color: #1a73e8; }
 .btn-reject { padding: 6px 16px; background: #fff; color: #d93025; border: 1px solid #f28b82; border-radius: 6px; cursor: pointer; font-size: 13px; white-space: nowrap; }
 .btn-reject:hover { background: #fce8e6; }
+
+.world-bottom-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
+.bottom-col { background: #fff; border-radius: 12px; padding: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); border: 1px solid #f1f3f4; }
+.bottom-col h3 { margin: 0 0 12px 0; font-size: 16px; }
+.btn-manage-collab-inline { padding: 6px 14px; background: #e8f0fe; color: #1a73e8; border: 1px dashed #1a73e8; border-radius: 6px; cursor: pointer; font-size: 13px; }
+.btn-manage-collab-inline:hover { background: #d2e3fc; }
+
+.bound-novel-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #f1f3f4; cursor: pointer; border-radius: 4px; }
+.bound-novel-row:hover { background: #f8f9fa; }
+.bound-novel-info { display: flex; gap: 8px; align-items: center; }
+.bound-novel-type { font-size: 11px; padding: 2px 6px; background: #e8f0fe; color: #1a73e8; border-radius: 4px; }
+.bound-novel-title { font-size: 14px; font-weight: 500; color: #202124; }
+.bound-novel-author { font-size: 13px; color: #999; }
+
+@media (max-width: 700px) { .world-bottom-cols { grid-template-columns: 1fr; } }
 </style>
