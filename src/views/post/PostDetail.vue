@@ -39,6 +39,28 @@ const loadPost = async () => {
   }
 }
 
+// Like/Dislike for post
+const handleReact = async (type: 'LIKE' | 'DISLIKE') => {
+  if (!userStore.isLogin()) return alert('请先登录')
+  if (!post.value) return
+  try {
+    await http.post(`/posts/${post.value.id}/react`, null, { params: { reactionType: type } })
+    if (post.value.currentUserReaction === type) {
+      post.value.currentUserReaction = null
+      if (type === 'LIKE') post.value.likeCount = (post.value.likeCount || 0) - 1
+      else post.value.dislikeCount = (post.value.dislikeCount || 0) - 1
+    } else {
+      if (post.value.currentUserReaction === 'LIKE') post.value.likeCount = (post.value.likeCount || 0) - 1
+      if (post.value.currentUserReaction === 'DISLIKE') post.value.dislikeCount = (post.value.dislikeCount || 0) - 1
+      post.value.currentUserReaction = type
+      if (type === 'LIKE') post.value.likeCount = (post.value.likeCount || 0) + 1
+      else post.value.dislikeCount = (post.value.dislikeCount || 0) + 1
+    }
+  } catch (e: any) {
+    alert(e.message || '操作失败')
+  }
+}
+
 // 普通用户：删除自己的帖子
 const handleDelete = async () => {
   if (!confirm('确定要删除这篇帖子吗？')) return
@@ -81,6 +103,14 @@ onMounted(() => { loadPost() })
           </span>
         </div>
 
+        <!-- Stats bar -->
+        <div class="post-stats">
+          <span>👁️ {{ post.viewCount || 0 }} 阅读</span>
+          <span>👍 {{ post.likeCount || 0 }}</span>
+          <span>👎 {{ post.dislikeCount || 0 }}</span>
+          <span>💬 {{ post.commentCount || 0 }} 评论</span>
+        </div>
+
         <h1 class="post-title">{{ post.title }}</h1>
 
         <div v-if="post.tags && post.tags.length > 0" class="post-tags">
@@ -91,8 +121,25 @@ onMounted(() => { loadPost() })
           <p v-for="(line, index) in post.body.split('\n')" :key="index">{{ line }}</p>
         </div>
 
-        <!-- 核心改造：根据身份动态显示操作按钮 -->
+        <!-- 赞/踩 + 作者操作 -->
         <div class="action-bar">
+          <button
+            class="action-btn react-btn"
+            :class="{ liked: post.currentUserReaction === 'LIKE' }"
+            @click="handleReact('LIKE')"
+          >
+            👍 赞 {{ post.likeCount || 0 }}
+          </button>
+          <button
+            class="action-btn react-btn"
+            :class="{ disliked: post.currentUserReaction === 'DISLIKE' }"
+            @click="handleReact('DISLIKE')"
+          >
+            👎 踩 {{ post.dislikeCount || 0 }}
+          </button>
+
+          <span class="action-spacer"></span>
+
           <!-- 情况1：是作者本人，显示常规操作 -->
           <template v-if="isAuthor">
             <button class="action-btn" @click="router.push(`/post/${post.id}/edit`)">✏️ 编辑内容</button>
@@ -139,7 +186,17 @@ onMounted(() => { loadPost() })
   border-top: 1px solid #e8eaed; padding-top: 24px;
 }
 .post-body p { margin: 0 0 16px 0; }
-.action-bar { display: flex; gap: 12px; padding-top: 16px; border-top: 1px solid #e8eaed; }
+.post-stats {
+  display: flex;
+  gap: 18px;
+  font-size: 14px;
+  color: #5f6368;
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #f1f3f4;
+}
+
+.action-bar { display: flex; gap: 12px; padding-top: 16px; border-top: 1px solid #e8eaed; align-items: center; }
 .action-btn {
   padding: 8px 16px; border: 1px solid #dadce0; background: #fff;
   border-radius: 6px; cursor: pointer; font-size: 14px; color: #333;
@@ -147,6 +204,11 @@ onMounted(() => { loadPost() })
 .action-btn:hover { background: #f8f9fa; border-color: #d2e3fc; color: #1a73e8; }
 .action-btn.btn-danger { color: #d93025; border-color: #f28b82; }
 .action-btn.btn-danger:hover { background: #fce8e6; color: #c5221f; border-color: #f28b82; }
+
+.react-btn.liked { background: #e6f4ea; color: #137333; border-color: #ceead6; }
+.react-btn.disliked { background: #fce8e6; color: #c5221f; border-color: #f28b82; }
+
+.action-spacer { flex: 1; }
 
 /* 管理员强删按钮样式：深红色醒目 */
 .action-btn.btn-admin-danger {

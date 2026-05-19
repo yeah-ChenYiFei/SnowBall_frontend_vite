@@ -34,6 +34,7 @@ export interface Post {
   commentCount?: number
   likeCount?: number
   dislikeCount?: number
+  viewCount?: number
   currentUserReaction?: 'LIKE' | 'DISLIKE' | null
 }
 

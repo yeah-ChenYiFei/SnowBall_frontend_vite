@@ -5,6 +5,7 @@ import { ROLES } from '@/constants/role' // ✅ 引入常量
 
 // 按需引入所有页面组件 (保持你原来的不变)
 import Home from '@/views/Home.vue'
+import Plaza from '@/views/Plaza.vue'
 import Create from '@/views/Create.vue'
 import SettingWriting from '@/views/create/SettingWriting.vue'
 import InspirationNote from '@/views/create/InspirationNote.vue'
@@ -32,7 +33,7 @@ import WritingDiary from '@/views/writing/WritingDiary.vue'
 const router = createRouter({
   history: createWebHistory(),
   routes: [
-    { path: '/', component: Home },
+    { path: '/', component: Plaza },
     { path: '/create', component: Create, meta: { requiresAuth: true } },
     { path: '/create/setting', component: SettingWriting },
     { path: '/create/setting/:worldId', component: WorldDetail },

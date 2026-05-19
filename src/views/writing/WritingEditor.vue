@@ -414,6 +414,11 @@ function goBack() {
 }
 
 onMounted(() => {
+  // Support ?type=DIARY etc. for direct entry from plaza
+  const qType = route.query.type as string | undefined
+  if (qType && ['ESSAY', 'DIARY', 'NOVEL'].includes(qType) && !isEditMode.value) {
+    selectType(qType as ArticleType)
+  }
   if (isEditMode.value) {
     loadArticle()
   }
