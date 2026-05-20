@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useUserStore } from './stores/user'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import http from '@/api/http'
 
 const userStore = useUserStore()
 const router = useRouter()
+const route = useRoute()
 
 const showWildMenu = ref(false)
 const showCreateMenu = ref(false)
@@ -106,6 +107,7 @@ function handleLogout() {
       <!-- 主导航 -->
       <nav class="main-nav">
         <div
+          v-if="route.path !== '/login' && route.path !== '/register'"
           class="nav-dropdown nav-link nav-link-dropdown"
           :class="{ 'is-active': showWildMenu }"
           @mouseenter="openWildMenu"

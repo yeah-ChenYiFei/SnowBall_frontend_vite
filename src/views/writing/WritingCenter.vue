@@ -20,6 +20,7 @@ const articleList = computed(() =>
 )
 
 const hoveredCardId = ref<number | null>(null)
+const hoveredPosition = ref<'left' | 'center' | 'right' | 'behind' | null>(null)
 
 const visibleCards = computed(() => {
   const list = articleList.value
@@ -181,11 +182,23 @@ async function togglePublish(article: Article) {
               'article-card',
               `card-${card.position}`,
               { 'card-hovered': hoveredCardId === card.article.id },
-              { 'card-dimmed': hoveredCardId !== null && hoveredCardId !== card.article.id },
+              {
+                'card-semi-dimmed':
+                  hoveredCardId !== null &&
+                  hoveredCardId !== card.article.id &&
+                  card.position === 'center' &&
+                  hoveredPosition !== 'center',
+              },
+              {
+                'card-full-dimmed':
+                  hoveredCardId !== null &&
+                  hoveredCardId !== card.article.id &&
+                  !(card.position === 'center' && hoveredPosition !== 'center'),
+              },
             ]"
-            @click="card.position === 'center' && goToArticle(card.article.id)"
-            @mouseenter="hoveredCardId = card.article.id"
-            @mouseleave="hoveredCardId = null"
+            @click="goToArticle(card.article.id)"
+            @mouseenter="hoveredCardId = card.article.id; hoveredPosition = card.position"
+            @mouseleave="hoveredCardId = null; hoveredPosition = null"
           >
             <div class="card-inner">
               <div class="card-type-row">
@@ -356,8 +369,14 @@ async function togglePublish(article: Article) {
   transform: translateX(-50%) translateZ(30px) scale(1.06) !important;
 }
 
-/* Dim all non-hovered cards when any card is hovered */
-.card-dimmed {
+/* Center card gets a medium dim when a side card is hovered — between normal and fully dimmed */
+.card-semi-dimmed {
+  filter: brightness(0.85) !important;
+  transition: filter 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Other non-hovered cards get fully dimmed */
+.card-full-dimmed {
   filter: grayscale(0.6) brightness(0.7) !important;
   transition: filter 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
