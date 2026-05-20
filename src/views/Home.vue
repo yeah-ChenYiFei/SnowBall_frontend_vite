@@ -2,6 +2,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import http from '@/api/http'
+import PostCard from '@/components/PostCard.vue'
 import type { Post, StoryChain } from '@/types'
 
 const activeTab = ref<'post' | 'chain'>('post')
@@ -103,46 +104,11 @@ const calcScore = (post: Post) => {
     <div v-if="isLoading" class="loading">加载中...</div>
 
     <!-- 帖子列表 -->
-    <div v-else-if="activeTab === 'post'" class="card-list">
+    <div v-else-if="activeTab === 'post'" class="post-grid">
       <div v-if="posts.length === 0" class="empty-state">还没有人发布内容，快来创作第一篇吧！</div>
-
-      <router-link
-        v-for="post in posts"
-        :key="post.id"
-        :to="`/post/${post.id}`"
-        class="post-card"
-      >
-        <div class="card-header">
-          <span class="type-badge">{{ typeMap[post.type] || post.type }}</span>
-          <span class="post-time">{{ new Date(post.createdAt).toLocaleDateString() }}</span>
-        </div>
-        <h3 class="card-title">{{ post.title }}</h3>
-        <p class="card-body">{{ post.body?.substring(0, 100) }}...</p>
-        <div class="card-footer">
-          <span class="author">👤 {{ post.authorName || '匿名' }}</span>
-          <div class="reaction-bar">
-            <button
-              class="react-btn like-btn"
-              :class="{ active: post.currentUserReaction === 'LIKE' }"
-              @click.prevent="handleReact(post, 'LIKE')"
-            >
-              👍 {{ post.likeCount || 0 }}
-            </button>
-            <button
-              class="react-btn dislike-btn"
-              :class="{ active: post.currentUserReaction === 'DISLIKE' }"
-              @click.prevent="handleReact(post, 'DISLIKE')"
-            >
-              👎 {{ post.dislikeCount || 0 }}
-            </button>
-            <span class="stats">💬 {{ post.commentCount || 0 }}</span>
-          </div>
-        </div>
-        <!-- 标签展示 -->
-        <div v-if="post.tags && post.tags.length > 0" class="card-tags">
-          <span v-for="tag in post.tags" :key="tag" class="mini-tag">#{{ tag }}</span>
-        </div>
-      </router-link>
+      <div v-for="(post, idx) in posts" :key="post.id" class="staggered-card">
+        <PostCard :post="post" :image-position="idx % 2 === 0 ? 'left' : 'right'" />
+      </div>
     </div>
 
     <!-- 接龙列表 -->
@@ -194,6 +160,9 @@ const calcScore = (post: Post) => {
 .loading { text-align: center; padding: 40px; color: #5f6368; }
 .empty-state { text-align: center; padding: 60px 20px; color: #999; background: #fff; border-radius: 8px; }
 
+.post-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.staggered-card:nth-child(even) { margin-top: 60px; }
+
 .card-list { display: flex; flex-direction: column; gap: 16px; }
 .post-card {
   background: #fff; padding: 20px 24px; border-radius: 8px;
@@ -213,23 +182,17 @@ const calcScore = (post: Post) => {
 .card-footer { display: flex; gap: 16px; font-size: 13px; color: #999; }
 .card-tags { margin-top: 10px; display: flex; gap: 6px; flex-wrap: wrap; }
 .mini-tag { font-size: 12px; color: #1a73e8; }
-.reaction-bar {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
+.reaction-bar { display: flex; gap: 8px; align-items: center; }
 .react-btn {
-  background: none;
-  border: 1px solid #e8eaed;
-  border-radius: 4px;
-  padding: 2px 8px;
-  font-size: 13px;
-  cursor: pointer;
-  color: #5f6368;
-  transition: all 0.2s;
+  background: none; border: 1px solid #e8eaed; border-radius: 4px;
+  padding: 2px 8px; font-size: 13px; cursor: pointer; color: #5f6368; transition: all 0.2s;
 }
 .react-btn:hover { background: #f1f3f4; }
 .like-btn.active { background: #e6f4ea; color: #137333; border-color: #ceead6; }
 .dislike-btn.active { background: #fce8e6; color: #c5221f; border-color: #f28b82; }
 
+@media (max-width: 700px) {
+  .post-grid { grid-template-columns: 1fr; }
+  .staggered-card:nth-child(even) { margin-top: 0; }
+}
 </style>

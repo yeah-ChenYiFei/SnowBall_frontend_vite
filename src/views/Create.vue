@@ -4,6 +4,7 @@ import { ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import http from '@/api/http'
 import TagInput from '@/comments/TagInput.vue'
+import PostImageGrid from '@/components/PostImageGrid.vue'
 import type { Result } from '@/types'
 
 const router = useRouter()
@@ -15,7 +16,8 @@ const isChainMode = ref(route.query.mode === 'chain')
 const formData = ref({
   type: 'FRAGMENT',
   title: '',
-  tags: [] as string[]
+  tags: [] as string[],
+  images: [] as string[]
 })
 
 // ✅ 修复二：用一个统一的 ref 接管 v-model，不再写三元表达式
@@ -94,6 +96,12 @@ async function handleSubmit() {
       <div v-if="!isChainMode" class="mb-3">
         <label class="form-label">标签 (回车添加)</label>
         <TagInput v-model="formData.tags" />
+      </div>
+
+      <!-- 图片配图 -->
+      <div v-if="!isChainMode" class="mb-3">
+        <label class="form-label">图片（可选，最多9张）</label>
+        <PostImageGrid v-model="formData.images" />
       </div>
 
       <div class="mb-3">

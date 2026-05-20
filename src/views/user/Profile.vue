@@ -3,6 +3,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import http from '@/api/http'
 import { useUserStore } from '@/stores/user'
+import UserAvatar from '@/components/UserAvatar.vue'
 import type { UserProfileFull, ContributionDay, RecentProject, BrowsingHistory, Activity, PublicChain } from '@/types'
 
 const route = useRoute()
@@ -252,7 +253,12 @@ watch(() => route.params.userId, loadProfile)
       <!-- Left Column: User Info -->
       <aside class="profile-left">
         <div class="user-card">
-          <div class="user-avatar-lg">{{ profile.user.username?.charAt(0)?.toUpperCase() || 'U' }}</div>
+          <UserAvatar
+            :username="profile.user.username"
+            :avatar-url="profile.user.avatarUrl"
+            :size="88"
+            class="user-avatar-lg"
+          />
           <h2 class="user-name">{{ profile.user.username }}</h2>
           <p class="user-signature">{{ profile.user.signature || '这个人很懒，还没有写签名...' }}</p>
           <div class="user-stats">
@@ -457,16 +463,6 @@ watch(() => route.params.userId, loadProfile)
 }
 
 .user-avatar-lg {
-  width: 88px;
-  height: 88px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #1a73e8, #4285f4);
-  color: #fff;
-  font-size: 36px;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   margin: 0 auto 16px;
 }
 

@@ -4,6 +4,9 @@ import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { useChatStore } from '@/stores/chat'
 import http from '@/api/http'
+import UserAvatar from '@/components/UserAvatar.vue'
+import ImageUploadButton from '@/components/ImageUploadButton.vue'
+import ImageLightbox from '@/components/ImageLightbox.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -11,6 +14,9 @@ const userStore = useUserStore()
 const chatStore = useChatStore()
 
 const inputText = ref('')
+const pendingImageUrl = ref('')
+const lightboxUrl = ref('')
+const showLightbox = ref(false)
 const chatEl = ref<HTMLElement | null>(null)
 const partnerName = ref('')
 const isLoading = ref(false)
@@ -69,14 +75,21 @@ function selectPartner(userId: number) {
 
 async function handleSend() {
   const body = inputText.value.trim()
-  if (!body) return
+  if (!body && !pendingImageUrl.value) return
   inputText.value = ''
-  await chatStore.sendMessage(body)
+  const imgUrl = pendingImageUrl.value
+  pendingImageUrl.value = ''
+  await chatStore.sendMessage(body || '[图片]', imgUrl || undefined)
   setTimeout(() => {
     if (chatEl.value) {
       chatEl.value.scrollTop = chatEl.value.scrollHeight
     }
   }, 50)
+}
+
+function onImageUploaded(url: string) {
+  pendingImageUrl.value = url
+  handleSend()
 }
 
 function handleKeydown(e: KeyboardEvent) {
@@ -109,7 +122,7 @@ function goBack() {
         :class="['partner-item', { active: activeId === p.id }]"
         @click="selectPartner(p.id)"
       >
-        <div class="partner-avatar">{{ p.username?.charAt(0) || '?' }}</div>
+        <UserAvatar :username="p.username || '?'" :avatar-url="p.avatarUrl" :size="32" class="partner-avatar" />
         <span class="partner-name">{{ p.username }}</span>
       </div>
     </aside>
@@ -133,6 +146,7 @@ function goBack() {
               <div class="msg-sender" v-if="msg.senderId !== userStore.userInfo?.id">
                 {{ msg.senderName }}
               </div>
+              <img v-if="msg.imageUrl" :src="msg.imageUrl" class="msg-image" @click="lightboxUrl = msg.imageUrl; showLightbox = true" />
               <div class="msg-body">{{ msg.body }}</div>
               <div class="msg-time">{{ new Date(msg.createdAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }) }}</div>
             </div>
@@ -150,7 +164,8 @@ function goBack() {
             rows="2"
             @keydown="handleKeydown"
           ></textarea>
-          <button class="btn-send" @click="handleSend" :disabled="!inputText.trim()">
+          <ImageUploadButton @uploaded="onImageUploaded" />
+          <button class="btn-send" @click="handleSend" :disabled="!inputText.trim() && !pendingImageUrl">
             发送
           </button>
         </div>
@@ -162,6 +177,7 @@ function goBack() {
         </div>
       </template>
     </main>
+    <ImageLightbox :visible="showLightbox" :image-url="lightboxUrl" @close="showLightbox = false" />
   </div>
 </template>
 
@@ -206,16 +222,7 @@ function goBack() {
 .partner-item:hover { background: #f8f9fa; }
 .partner-item.active { background: #e8f0fe; }
 .partner-avatar {
-  width: 32px; height: 32px;
-  border-radius: 50%;
-  background: #1a73e8;
-  color: #fff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 600;
-  font-size: 14px;
-  flex-shrink: 0;
+  /* sizing handled by UserAvatar component */
 }
 .partner-name { font-size: 14px; color: #202124; }
 
@@ -278,6 +285,10 @@ function goBack() {
   line-height: 1.5;
   color: #333;
   word-break: break-word;
+}
+.msg-image {
+  max-width: 240px; max-height: 200px; border-radius: 8px;
+  cursor: pointer; object-fit: cover; display: block; margin-bottom: 4px;
 }
 .msg-time {
   font-size: 11px;

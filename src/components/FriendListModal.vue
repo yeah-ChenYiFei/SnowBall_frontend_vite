@@ -2,6 +2,7 @@
 import { ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useFriendStore } from '@/stores/friend'
+import UserAvatar from '@/components/UserAvatar.vue'
 
 const props = defineProps<{ show: boolean }>()
 const emit = defineEmits<{ (e: 'close'): void }>()
@@ -69,7 +70,7 @@ async function handleReject(friend: { id?: number; userId: number }) {
             class="friend-row"
             @click="goToProfile(f.userId)"
           >
-            <div class="friend-avatar">{{ f.username?.charAt(0) || '?' }}</div>
+            <UserAvatar :username="f.username" :avatar-url="f.avatarUrl" :size="36" class="friend-avatar" />
             <span class="friend-name">{{ f.username }}</span>
           </div>
         </div>
@@ -84,7 +85,7 @@ async function handleReject(friend: { id?: number; userId: number }) {
             :key="f.userId"
             class="request-row"
           >
-            <div class="friend-avatar">{{ f.username?.charAt(0) || '?' }}</div>
+            <UserAvatar :username="f.username" :avatar-url="f.avatarUrl" :size="36" class="friend-avatar" />
             <span class="friend-name">{{ f.username }}</span>
             <div class="request-actions">
               <button class="btn-accept" @click="handleAccept(f)">同意</button>
@@ -172,15 +173,7 @@ async function handleReject(friend: { id?: number; userId: number }) {
 }
 .friend-row:hover, .request-row:hover { background: #f8f9fa; }
 .friend-avatar {
-  width: 36px; height: 36px;
-  border-radius: 50%;
-  background: #1a73e8;
-  color: #fff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 600;
-  flex-shrink: 0;
+  /* sizing handled by UserAvatar component */
 }
 .friend-name { flex: 1; font-size: 14px; color: #202124; }
 .request-row { cursor: default; }

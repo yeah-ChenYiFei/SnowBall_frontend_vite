@@ -38,10 +38,12 @@ export const useChatStore = defineStore('chat', () => {
     } catch { /* silent */ }
   }
 
-  async function sendMessage(body: string) {
+  async function sendMessage(body: string, imageUrl?: string) {
     if (!activeUserId.value) return
     try {
-      const res = await http.post<PrivateMessage>(`/chat/${activeUserId.value}`, { body })
+      const payload: any = { body }
+      if (imageUrl) payload.imageUrl = imageUrl
+      const res = await http.post<PrivateMessage>(`/chat/${activeUserId.value}`, payload)
       messages.value.push(res.data)
     } catch { /* silent */ }
   }

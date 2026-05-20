@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { useFriendStore } from '@/stores/friend'
 import { useUserStore } from '@/stores/user'
 import http from '@/api/http'
+import UserAvatar from '@/components/UserAvatar.vue'
 import type { FriendshipStatus, Post } from '@/types'
 
 const props = defineProps<{
@@ -24,6 +25,7 @@ const userStore = useUserStore()
 
 const status = ref<FriendshipStatus>({ status: 'NONE' })
 const username = ref('')
+const avatarUrl = ref<string | null>(null)
 const userRole = ref('')
 const recentPosts = ref<Post[]>([])
 const loaded = ref(false)
@@ -42,6 +44,7 @@ onMounted(async () => {
   status.value = s
   if (profileRes) {
     username.value = profileRes.user?.username || ''
+    avatarUrl.value = profileRes.user?.avatarUrl || null
     userRole.value = profileRes.user?.role || ''
     recentPosts.value = (profileRes.posts || []).slice(0, 3)
   }
@@ -100,7 +103,7 @@ const formatDate = (iso: string) => new Date(iso).toLocaleDateString('zh-CN')
       <div v-if="!loaded" class="hover-loading">加载中...</div>
       <template v-else>
         <div class="hover-user-info">
-          <div class="hover-avatar">{{ username.charAt(0) || '?' }}</div>
+          <UserAvatar :username="username" :avatar-url="avatarUrl" :size="44" class="hover-avatar" />
           <div class="hover-user-text">
             <span class="hover-username">{{ username || '用户' + userId }}</span>
             <span v-if="userRole" class="hover-role">{{ userRole }}</span>
@@ -163,16 +166,7 @@ const formatDate = (iso: string) => new Date(iso).toLocaleDateString('zh-CN')
   border-bottom: 1px solid #f1f3f4;
 }
 .hover-avatar {
-  width: 44px; height: 44px;
-  border-radius: 50%;
-  background: #1a73e8;
-  color: #fff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 600;
-  font-size: 18px;
-  flex-shrink: 0;
+  /* sizing handled by UserAvatar component */
 }
 .hover-user-text {
   display: flex;

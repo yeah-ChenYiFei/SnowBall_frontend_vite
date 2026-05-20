@@ -4,6 +4,9 @@ import { useRouter } from 'vue-router'
 import { useFriendStore } from '@/stores/friend'
 import { useUserStore } from '@/stores/user'
 import http from '@/api/http'
+import UserAvatar from '@/components/UserAvatar.vue'
+import ImageUploadButton from '@/components/ImageUploadButton.vue'
+import ImageLightbox from '@/components/ImageLightbox.vue'
 import type { Friend, PrivateMessage } from '@/types'
 
 const router = useRouter()
@@ -14,6 +17,9 @@ const tab = ref<'friends' | 'pending'>('friends')
 const selectedFriend = ref<Friend | null>(null)
 const messages = ref<PrivateMessage[]>([])
 const newMsg = ref('')
+const pendingImageUrl = ref('')
+const lightboxUrl = ref('')
+const showLightbox = ref(false)
 const isLoadingMsgs = ref(false)
 const chatRef = ref<HTMLElement | null>(null)
 let pollTimer: ReturnType<typeof setInterval> | null = null
@@ -48,16 +54,24 @@ function scrollToBottom() {
   }
 }
 
-async function sendMessage() {
+async function sendMessage(imageUrl?: string) {
   const body = newMsg.value.trim()
-  if (!body || !selectedFriend.value) return
+  if (!body && !imageUrl) return
+  if (!selectedFriend.value) return
   try {
-    await http.post(`/chat/${selectedFriend.value.userId}`, { body })
+    const payload: any = { body: body || '[图片]' }
+    if (imageUrl) payload.imageUrl = imageUrl
+    await http.post(`/chat/${selectedFriend.value.userId}`, payload)
     newMsg.value = ''
+    pendingImageUrl.value = ''
     loadMessages(selectedFriend.value.userId)
   } catch (e: any) {
     alert(e.message || '发送失败')
   }
+}
+
+function onImageUploaded(url: string) {
+  sendMessage(url)
 }
 
 function goToProfile(userId: number) {
@@ -121,7 +135,12 @@ onUnmounted(() => {
           :class="{ 'friend-selected': selectedFriend?.userId === f.userId }"
           @click="selectFriend(f)"
         >
-          <div class="friend-avatar-sm">{{ f.username?.charAt(0) || '?' }}</div>
+          <UserAvatar
+            :username="f.username"
+            :avatar-url="f.avatarUrl"
+            :size="36"
+            class="friend-avatar-sm"
+          />
           <div class="friend-item-info">
             <span class="friend-name">{{ f.username }}</span>
             <span class="friend-since">好友始于 {{ new Date(f.since).toLocaleDateString('zh-CN') }}</span>
@@ -134,7 +153,12 @@ onUnmounted(() => {
       <div v-else class="friends-list">
         <div v-if="friendStore.pendingRequests.length === 0" class="empty-hint">没有待处理的好友请求</div>
         <div v-for="f in friendStore.pendingRequests" :key="f.userId" class="request-item">
-          <div class="friend-avatar-sm">{{ f.username?.charAt(0) || '?' }}</div>
+          <UserAvatar
+            :username="f.username"
+            :avatar-url="f.avatarUrl"
+            :size="36"
+            class="friend-avatar-sm"
+          />
           <div class="friend-item-info">
             <span class="friend-name">{{ f.username }}</span>
             <span class="friend-since">请求添加你为好友</span>
@@ -152,7 +176,12 @@ onUnmounted(() => {
       <template v-if="selectedFriend">
         <div class="chat-header">
           <div class="chat-friend-info" @click="goToProfile(selectedFriend.userId)">
-            <div class="friend-avatar-sm">{{ selectedFriend.username?.charAt(0) || '?' }}</div>
+            <UserAvatar
+              :username="selectedFriend.username"
+              :avatar-url="selectedFriend.avatarUrl"
+              :size="36"
+              class="friend-avatar-sm"
+            />
             <span class="chat-friend-name">{{ selectedFriend.username }}</span>
           </div>
         </div>
@@ -165,6 +194,7 @@ onUnmounted(() => {
             class="msg-bubble"
             :class="{ 'msg-mine': msg.senderId === userStore.userInfo?.id }"
           >
+            <img v-if="msg.imageUrl" :src="msg.imageUrl" class="msg-image" @click="lightboxUrl = msg.imageUrl; showLightbox = true" />
             <div class="msg-text">{{ msg.body }}</div>
             <div class="msg-time">{{ formatTime(msg.createdAt) }}</div>
           </div>
@@ -175,9 +205,10 @@ onUnmounted(() => {
             type="text"
             class="chat-input"
             placeholder="输入消息..."
-            @keyup.enter="sendMessage"
+            @keyup.enter="sendMessage()"
           />
-          <button class="btn-send" @click="sendMessage">发送</button>
+          <ImageUploadButton @uploaded="onImageUploaded" />
+          <button class="btn-send" @click="sendMessage()">发送</button>
         </div>
       </template>
       <template v-else>
@@ -187,6 +218,7 @@ onUnmounted(() => {
         </div>
       </template>
     </div>
+    <ImageLightbox :visible="showLightbox" :image-url="lightboxUrl" @close="showLightbox = false" />
   </div>
 </template>
 
@@ -247,10 +279,7 @@ onUnmounted(() => {
 .friend-item.friend-selected { background: #e8f0fe; border: 1px solid #d2e3fc; }
 
 .friend-avatar-sm {
-  width: 36px; height: 36px; border-radius: 50%;
-  background: #1a73e8; color: #fff; display: flex;
-  align-items: center; justify-content: center;
-  font-weight: 600; font-size: 15px; flex-shrink: 0;
+  /* sizing handled by UserAvatar component */
 }
 .friend-item-info { flex: 1; min-width: 0; }
 .friend-name { font-size: 14px; color: #202124; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -290,6 +319,10 @@ onUnmounted(() => {
 .msg-mine .msg-text { background: #1a73e8; color: #fff; }
 .msg-time { font-size: 11px; color: #999; margin-top: 2px; padding: 0 4px; }
 .msg-mine .msg-time { text-align: right; }
+.msg-image {
+  max-width: 200px; max-height: 180px; border-radius: 8px;
+  cursor: pointer; object-fit: cover; display: block; margin-bottom: 6px;
+}
 
 .chat-input-area { display: flex; gap: 10px; padding: 14px 20px; border-top: 1px solid #e8eaed; background: #fff; }
 .chat-input {

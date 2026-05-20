@@ -7,12 +7,15 @@ import { useUserStore } from '@/stores/user'
 import { ROLES, ROLE_LABEL_MAP } from '@/constants/role' // ✅ 引入角色常量
 import type { UserProfileVO } from '@/types'
 import FriendListModal from '@/components/FriendListModal.vue'
+import UserAvatar from '@/components/UserAvatar.vue'
 
 const router = useRouter()
 const userStore = useUserStore()
 const profileData = ref<UserProfileVO | null>(null)
 const isLoading = ref(true)
 const showFriendModal = ref(false)
+const uploadingAvatar = ref(false)
+const fileInput = ref<HTMLInputElement | null>(null)
 
 const loadData = async () => {
   try {
@@ -27,6 +30,48 @@ const loadData = async () => {
     console.error('加载个人主页失败', error)
   } finally {
     isLoading.value = false
+  }
+}
+
+function triggerAvatarUpload() {
+  fileInput.value?.click()
+}
+
+async function onAvatarFileChange(e: Event) {
+  const input = e.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+
+  if (!file.type.startsWith('image/')) {
+    alert('请选择图片文件')
+    return
+  }
+  if (file.size > 5 * 1024 * 1024) {
+    alert('图片大小不能超过 5MB')
+    return
+  }
+
+  uploadingAvatar.value = true
+  try {
+    const formData = new FormData()
+    formData.append('file', file)
+    const res = await http.post<{ avatarUrl: string }>('/users/avatar', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+    const newUrl = res.data.avatarUrl
+    // Update profile data display
+    if (profileData.value?.user) {
+      profileData.value.user.avatarUrl = newUrl
+    }
+    // Update user store so navbar etc. reflects it
+    if (userStore.userInfo) {
+      userStore.userInfo.avatarUrl = newUrl
+    }
+  } catch (e: any) {
+    alert(e.message || '上传失败')
+  } finally {
+    uploadingAvatar.value = false
+    input.value = ''
   }
 }
 
@@ -47,7 +92,24 @@ onMounted(async () => {
     <template v-else-if="profileData">
       <!-- 个人信息卡片 -->
       <div class="profile-card">
-        <div class="avatar">{{ profileData.user.username?.charAt(0)?.toUpperCase() || 'U' }}</div>
+        <div class="avatar-wrapper" @click="triggerAvatarUpload" :title="uploadingAvatar ? '上传中...' : '点击更换头像'">
+          <UserAvatar
+            :username="profileData.user.username"
+            :avatar-url="profileData.user.avatarUrl"
+            :size="64"
+          />
+          <div class="avatar-overlay">
+            <span v-if="uploadingAvatar" class="upload-spinner">⏳</span>
+            <span v-else class="upload-hint">📷</span>
+          </div>
+        </div>
+        <input
+          ref="fileInput"
+          type="file"
+          accept="image/*"
+          style="display: none"
+          @change="onAvatarFileChange"
+        />
         <div class="user-info">
           <h2>{{ profileData.user.username }}</h2>
           <!-- ✅ 规范化：使用常量映射显示中文，不再写死字符串 -->
@@ -151,18 +213,39 @@ onMounted(async () => {
   align-items: center;
   margin-bottom: 24px;
 }
-.avatar {
-  width: 64px;
-  height: 64px;
-  border-radius: 50%;
-  background: #1a73e8;
-  color: white;
-  font-size: 28px;
-  font-weight: 600;
-  display: flex;
-  justify-content: center;
-  align-items: center;
+.avatar-wrapper {
+  position: relative;
+  cursor: pointer;
   flex-shrink: 0;
+}
+
+.avatar-overlay {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+}
+
+.avatar-wrapper:hover .avatar-overlay {
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.upload-hint {
+  opacity: 0;
+  font-size: 18px;
+  transition: opacity 0.2s;
+}
+
+.avatar-wrapper:hover .upload-hint {
+  opacity: 1;
+}
+
+.upload-spinner {
+  font-size: 18px;
 }
 .user-info h2 {
   margin: 0 0 4px 0;

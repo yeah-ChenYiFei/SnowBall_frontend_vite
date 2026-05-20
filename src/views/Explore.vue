@@ -2,6 +2,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import http from '@/api/http'
+import PostCard from '@/components/PostCard.vue'
 import type { Post } from '@/types'
 
 const posts = ref<Post[]>([])
@@ -102,26 +103,12 @@ onMounted(() => {
         没有找到匹配的内容，换个关键词试试？
       </div>
 
-      <!-- 复用首页的卡片风格 -->
-      <router-link
-        v-for="post in posts"
-        :key="post.id"
-        :to="`/post/${post.id}`"
-        class="result-card"
-      >
-        <div class="card-header">
-          <span class="type-badge">{{ typeMap[post.type] || post.type }}</span>
-          <span class="post-time">{{ new Date(post.createdAt).toLocaleDateString() }}</span>
+      <!-- 搜索结果卡片 -->
+      <div class="post-grid">
+        <div v-for="(post, idx) in posts" :key="post.id" class="staggered-card">
+          <PostCard :post="post" :image-position="idx % 2 === 0 ? 'left' : 'right'" />
         </div>
-        <h3 class="card-title">{{ post.title }}</h3>
-        <p class="card-body">{{ post.body?.substring(0, 120) }}...</p>
-        <div class="card-footer">
-          <span class="author">👤 {{ post.authorName || '匿名' }}</span>
-          <div v-if="post.tags && post.tags.length > 0" class="card-tags">
-            <span v-for="tag in post.tags" :key="tag" class="mini-tag">#{{ tag }}</span>
-          </div>
-        </div>
-      </router-link>
+      </div>
     </div>
   </div>
 </template>
@@ -156,20 +143,11 @@ onMounted(() => {
 .result-count { font-size: 14px; color: #5f6368; margin-bottom: 16px; }
 .empty-state { text-align: center; padding: 60px 20px; color: #999; background: #fff; border-radius: 8px; }
 
-.search-results { display: flex; flex-direction: column; gap: 16px; }
-.result-card {
-  background: #fff; padding: 20px 24px; border-radius: 8px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.06); text-decoration: none; color: inherit;
-  display: block; transition: transform 0.2s, box-shadow 0.2s;
+.search-results { }
+.post-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.staggered-card:nth-child(even) { margin-top: 60px; }
+@media (max-width: 700px) {
+  .post-grid { grid-template-columns: 1fr; }
+  .staggered-card:nth-child(even) { margin-top: 0; }
 }
-.result-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
-.card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-.type-badge { font-size: 12px; padding: 2px 8px; border-radius: 4px; background: #e8f0fe; color: #1a73e8; }
-.post-time { font-size: 13px; color: #999; }
-.card-title { font-size: 18px; font-weight: 600; margin: 0 0 8px 0; color: #202124; }
-.card-body { font-size: 14px; color: #5f6368; line-height: 1.5; margin: 0 0 12px 0; }
-.card-footer { display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: #999; }
-.author { margin-right: 16px; }
-.card-tags { display: flex; gap: 6px; flex-wrap: wrap; }
-.mini-tag { font-size: 12px; color: #1a73e8; }
 </style>

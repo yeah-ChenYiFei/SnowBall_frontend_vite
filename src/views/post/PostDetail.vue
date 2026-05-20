@@ -7,6 +7,8 @@ import { useUserStore } from '@/stores/user'
 import { ROLES } from '@/constants/role' // ✅ 引入角色常量
 import CommentList from '@/comments/CommentList.vue'
 import UserHoverMenu from '@/components/UserHoverMenu.vue'
+import ImageGallery from '@/components/ImageGallery.vue'
+import ImageLightbox from '@/components/ImageLightbox.vue'
 import type { Post } from '@/types'
 
 const route = useRoute()
@@ -123,32 +125,45 @@ onMounted(() => { loadPost() })
   <div class="detail-page">
     <div v-if="isLoading" class="loading">加载中...</div>
 
-    <div v-else-if="post" class="detail-container">
-      <button class="btn-back" @click="router.back()">← 返回</button>
+    <div v-else-if="post" class="detail-layout">
+      <!-- Left 2/3: Image Gallery -->
+      <div class="detail-gallery">
+        <ImageGallery v-if="post.images?.length" :images="post.images" :alt="post.title" />
+        <div v-else class="no-image-placeholder">
+          <span class="placeholder-icon">📝</span>
+          <span class="placeholder-text">纯文本内容</span>
+        </div>
+      </div>
 
-      <article class="post-content">
+      <!-- Right 1/3: Content -->
+      <div class="detail-content">
+        <button class="btn-back" @click="router.back()">← 返回</button>
+
         <div class="post-header">
           <span class="type-badge">{{ typeMap[post.type] || post.type }}</span>
-          <span class="meta-info">
-            <span
-              class="author-link"
-              @click.stop="router.push(`/profile/${post.userId}`)"
-              @mouseenter.stop="onAuthorEnter($event, post.userId)"
-              @mouseleave="onAuthorLeave"
-            >👤 {{ post.authorName || '匿名' }}</span>
-             · {{ new Date(post.createdAt).toLocaleString() }} · V{{ post.version }}
-          </span>
         </div>
 
-        <!-- Stats bar -->
+        <h1 class="post-title">{{ post.title }}</h1>
+
+        <div class="post-meta">
+          <span
+            class="author-link"
+            @click.stop="router.push(`/profile/${post.userId}`)"
+            @mouseenter.stop="onAuthorEnter($event, post.userId)"
+            @mouseleave="onAuthorLeave"
+          >👤 {{ post.authorName || '匿名' }}</span>
+          <span class="meta-sep">·</span>
+          <span>{{ new Date(post.createdAt).toLocaleDateString() }}</span>
+          <span class="meta-sep">·</span>
+          <span>V{{ post.version }}</span>
+        </div>
+
         <div class="post-stats">
           <span>👁️ {{ post.viewCount || 0 }} 阅读</span>
           <span>👍 {{ post.likeCount || 0 }}</span>
           <span>👎 {{ post.dislikeCount || 0 }}</span>
           <span>💬 {{ post.commentCount || 0 }} 评论</span>
         </div>
-
-        <h1 class="post-title">{{ post.title }}</h1>
 
         <div v-if="post.tags && post.tags.length > 0" class="post-tags">
           <span v-for="tag in post.tags" :key="tag" class="tag-pill">#{{ tag }}</span>
@@ -158,41 +173,30 @@ onMounted(() => { loadPost() })
           <p v-for="(line, index) in post.body.split('\n')" :key="index">{{ line }}</p>
         </div>
 
-        <!-- 赞/踩 + 作者操作 -->
         <div class="action-bar">
           <button
             class="action-btn react-btn"
             :class="{ liked: post.currentUserReaction === 'LIKE' }"
             @click="handleReact('LIKE')"
-          >
-            👍 赞 {{ post.likeCount || 0 }}
-          </button>
+          >👍 赞 {{ post.likeCount || 0 }}</button>
           <button
             class="action-btn react-btn"
             :class="{ disliked: post.currentUserReaction === 'DISLIKE' }"
             @click="handleReact('DISLIKE')"
-          >
-            👎 踩 {{ post.dislikeCount || 0 }}
-          </button>
-
+          >👎 踩 {{ post.dislikeCount || 0 }}</button>
           <span class="action-spacer"></span>
-
-          <!-- 情况1：是作者本人，显示常规操作 -->
           <template v-if="isAuthor">
-            <button class="action-btn" @click="router.push(`/post/${post.id}/edit`)">✏️ 编辑内容</button>
-            <button class="action-btn" @click="router.push(`/post/${post.id}/versions`)">📜 版本历史</button>
-            <button class="action-btn btn-danger" @click="handleDelete">🗑️ 删除帖子</button>
+            <button class="action-btn" @click="router.push(`/post/${post.id}/edit`)">✏️ 编辑</button>
+            <button class="action-btn" @click="router.push(`/post/${post.id}/versions`)">📜 历史</button>
+            <button class="action-btn btn-danger" @click="handleDelete">🗑️ 删除</button>
           </template>
-
-          <!-- 情况2：不是作者，但是管理员，显示强删按钮 -->
           <template v-else-if="isAdmin">
-            <button class="action-btn btn-admin-danger" @click="handleAdminDelete">🛡️ 管理员强删</button>
+            <button class="action-btn btn-admin-danger" @click="handleAdminDelete">🛡️ 强删</button>
           </template>
         </div>
-      </article>
 
-      <!-- 真实评论区挂载 -->
-      <CommentList :post-id="post.id" />
+        <CommentList :post-id="post.id" />
+      </div>
     </div>
 
     <UserHoverMenu
@@ -212,61 +216,73 @@ onMounted(() => { loadPost() })
 </template>
 
 <style scoped>
-.detail-page { max-width: 800px; margin: 0 auto; }
+.detail-page { width: 100%; min-height: 100vh; }
 .loading, .error-state { text-align: center; padding: 60px 20px; color: #999; }
 .error-state a { color: #1a73e8; }
 
-.btn-back {
-  background: none; border: none; color: #1a73e8; font-size: 14px;
-  cursor: pointer; margin-bottom: 16px; padding: 0;
-}
-.detail-container { background: #fff; padding: 32px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
-.post-content { }
-.post-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; color: #5f6368; font-size: 14px; }
-.type-badge { background: #e8f0fe; color: #1a73e8; padding: 4px 10px; border-radius: 4px; font-size: 12px; }
-.author-link { cursor: pointer; padding: 2px 6px; border-radius: 4px; transition: background 0.15s; }
-.author-link:hover { background: #e8f0fe; color: #1a73e8; }
-.post-title { font-size: 28px; font-weight: 700; color: #202124; margin: 0 0 16px 0; line-height: 1.3; }
-.post-tags { display: flex; gap: 8px; margin-bottom: 24px; flex-wrap: wrap; }
-.tag-pill { background: #f1f3f4; color: #5f6368; padding: 4px 12px; border-radius: 12px; font-size: 13px; }
-.post-body {
-  font-size: 16px; line-height: 1.8; color: #333; margin-bottom: 32px;
-  border-top: 1px solid #e8eaed; padding-top: 24px;
-}
-.post-body p { margin: 0 0 16px 0; }
-.post-stats {
-  display: flex;
-  gap: 18px;
-  font-size: 14px;
-  color: #5f6368;
-  margin-bottom: 20px;
-  padding-bottom: 16px;
-  border-bottom: 1px solid #f1f3f4;
+.detail-layout {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 32px;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 20px;
+  align-items: start;
 }
 
-.action-bar { display: flex; gap: 12px; padding-top: 16px; border-top: 1px solid #e8eaed; align-items: center; }
-.action-btn {
-  padding: 8px 16px; border: 1px solid #dadce0; background: #fff;
-  border-radius: 6px; cursor: pointer; font-size: 14px; color: #333;
+.detail-gallery {
+  position: sticky;
+  top: 20px;
 }
+
+.no-image-placeholder {
+  width: 100%; aspect-ratio: 16/10;
+  background: #f5f5f5; border-radius: 12px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  color: #999; gap: 8px;
+}
+.placeholder-icon { font-size: 48px; }
+.placeholder-text { font-size: 14px; }
+
+.detail-content {
+  min-width: 0;
+}
+
+.btn-back {
+  background: none; border: none; color: #1a73e8; font-size: 14px;
+  cursor: pointer; margin-bottom: 12px; padding: 0;
+}
+
+.post-header { margin-bottom: 12px; }
+.type-badge { background: #e8f0fe; color: #1a73e8; padding: 4px 10px; border-radius: 4px; font-size: 12px; }
+.post-title { font-size: 24px; font-weight: 700; color: #202124; margin: 0 0 12px 0; line-height: 1.3; }
+
+.post-meta { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #5f6368; margin-bottom: 12px; flex-wrap: wrap; }
+.author-link { cursor: pointer; padding: 2px 6px; border-radius: 4px; transition: background 0.15s; color: #1a73e8; font-weight: 500; }
+.author-link:hover { background: #e8f0fe; }
+.meta-sep { color: #dadce0; }
+
+.post-stats { display: flex; gap: 16px; font-size: 13px; color: #5f6368; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid #f1f3f4; }
+
+.post-tags { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
+.tag-pill { background: #f1f3f4; color: #5f6368; padding: 4px 12px; border-radius: 12px; font-size: 13px; }
+
+.post-body { font-size: 15px; line-height: 1.8; color: #333; margin-bottom: 24px; }
+.post-body p { margin: 0 0 12px 0; }
+
+.action-bar { display: flex; gap: 8px; padding-top: 16px; border-top: 1px solid #e8eaed; align-items: center; flex-wrap: wrap; margin-bottom: 24px; }
+.action-btn { padding: 6px 14px; border: 1px solid #dadce0; background: #fff; border-radius: 6px; cursor: pointer; font-size: 13px; color: #333; }
 .action-btn:hover { background: #f8f9fa; border-color: #d2e3fc; color: #1a73e8; }
 .action-btn.btn-danger { color: #d93025; border-color: #f28b82; }
 .action-btn.btn-danger:hover { background: #fce8e6; color: #c5221f; border-color: #f28b82; }
-
 .react-btn.liked { background: #e6f4ea; color: #137333; border-color: #ceead6; }
 .react-btn.disliked { background: #fce8e6; color: #c5221f; border-color: #f28b82; }
-
 .action-spacer { flex: 1; }
+.action-btn.btn-admin-danger { color: #fff; background: #d93025; border-color: #d93025; font-weight: 600; }
+.action-btn.btn-admin-danger:hover { background: #c5221f; border-color: #c5221f; }
 
-/* 管理员强删按钮样式：深红色醒目 */
-.action-btn.btn-admin-danger {
-  color: #fff;
-  background: #d93025;
-  border-color: #d93025;
-  font-weight: 600;
-}
-.action-btn.btn-admin-danger:hover {
-  background: #c5221f;
-  border-color: #c5221f;
+@media (max-width: 860px) {
+  .detail-layout { grid-template-columns: 1fr; }
+  .detail-gallery { position: static; }
 }
 </style>

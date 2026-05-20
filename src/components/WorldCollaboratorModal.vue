@@ -2,6 +2,7 @@
 import { ref, watch } from 'vue'
 import http from '@/api/http'
 import { useFriendStore } from '@/stores/friend'
+import UserAvatar from '@/components/UserAvatar.vue'
 import type { Friend, Collaborator } from '@/types'
 
 const props = defineProps<{
@@ -59,7 +60,7 @@ async function addCollaborator(friendId: number) {
             :key="f.userId"
             class="friend-row"
           >
-            <div class="friend-avatar">{{ f.username?.charAt(0) || '?' }}</div>
+            <UserAvatar :username="f.username || '?'" :avatar-url="f.avatarUrl" :size="36" class="friend-avatar" />
             <span class="friend-name">{{ f.username }}</span>
             <button
               class="btn-add"
@@ -99,10 +100,7 @@ async function addCollaborator(friendId: number) {
 .friend-row { display: flex; align-items: center; gap: 12px; padding: 10px; border-radius: 8px; }
 .friend-row:hover { background: #f8f9fa; }
 .friend-avatar {
-  width: 36px; height: 36px; border-radius: 50%;
-  background: #1a73e8; color: #fff;
-  display: flex; align-items: center; justify-content: center;
-  font-weight: 600; flex-shrink: 0;
+  /* sizing handled by UserAvatar component */
 }
 .friend-name { flex: 1; font-size: 14px; color: #202124; }
 .btn-add {

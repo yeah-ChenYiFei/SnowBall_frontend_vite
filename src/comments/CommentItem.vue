@@ -3,6 +3,7 @@ import { ref, computed, watch, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import http from '@/api/http'
 import { useUserStore } from '@/stores/user'
+import ImageUploadButton from '@/components/ImageUploadButton.vue'
 import type { Comment } from '@/types'
 
 const props = defineProps<{
@@ -13,13 +14,15 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'open-reply', id: number | null): void
-  (e: 'submit-reply', parentId: number, body: string): void
+  (e: 'submit-reply', parentId: number, body: string, imageUrl?: string): void
   (e: 'refresh'): void
+  (e: 'open-lightbox', url: string): void
 }>()
 
 const router = useRouter()
 const userStore = useUserStore()
 const replyText = ref('')
+const replyImageUrl = ref('')
 const replyRef = ref<HTMLTextAreaElement | null>(null)
 
 const isReplying = computed(() => props.comment.id === props.activeReplyId)
@@ -30,6 +33,7 @@ const handleReplyClick = () => {
     emit('open-reply', null)
   } else {
     replyText.value = ''
+    replyImageUrl.value = ''
     emit('open-reply', props.comment.id)
   }
 }
@@ -39,9 +43,9 @@ const handleCancel = () => {
 }
 
 const handleSubmitReply = () => {
-  if (!replyText.value.trim()) return
+  if (!replyText.value.trim() && !replyImageUrl.value) return
   if (!userStore.isLogin()) return alert('请先登录')
-  emit('submit-reply', props.comment.id, replyText.value.trim())
+  emit('submit-reply', props.comment.id, replyText.value.trim() || '[图片]', replyImageUrl.value || undefined)
 }
 
 const handleLike = async () => {
@@ -77,6 +81,12 @@ watch(isReplying, (newVal) => {
         <span v-if="parentAuthorName" class="reply-tag">/@{{ parentAuthorName }}</span>
         {{ comment.body }}
       </p>
+      <img
+        v-if="comment.imageUrl"
+        :src="comment.imageUrl"
+        class="comment-image"
+        @click="emit('open-lightbox', comment.imageUrl!)"
+      />
       <div class="comment-actions">
         <button
           class="btn-like"
@@ -97,6 +107,8 @@ watch(isReplying, (newVal) => {
           class="inline-textarea"
         ></textarea>
         <div class="inline-reply-actions">
+          <ImageUploadButton @uploaded="replyImageUrl = $event" />
+          <span class="inline-spacer"></span>
           <button class="btn-inline-submit" @click="handleSubmitReply">发送</button>
           <button class="btn-inline-cancel" @click="handleCancel">取消</button>
         </div>
@@ -111,8 +123,9 @@ watch(isReplying, (newVal) => {
         :parent-author-name="comment.authorName"
         :active-reply-id="activeReplyId"
         @open-reply="(id: number | null) => emit('open-reply', id)"
-        @submit-reply="(pid: number, body: string) => emit('submit-reply', pid, body)"
+        @submit-reply="(pid: number, body: string, imgUrl?: string) => emit('submit-reply', pid, body, imgUrl)"
         @refresh="emit('refresh')"
+        @open-lightbox="(url: string) => emit('open-lightbox', url)"
       />
     </div>
   </div>
@@ -132,6 +145,11 @@ watch(isReplying, (newVal) => {
 .btn-like.liked { font-weight: 600; }
 .btn-reply { background: none; border: none; color: #999; font-size: 13px; cursor: pointer; padding: 2px 4px; white-space: nowrap; }
 .btn-reply:hover { color: #1a73e8; }
+.comment-image {
+  max-width: 240px; max-height: 200px; border-radius: 6px;
+  cursor: pointer; object-fit: cover; display: block; margin-bottom: 8px;
+}
+.inline-spacer { flex: 1; }
 .children-thread { margin-left: 12px; padding-left: 8px; border-left: 2px solid #e8eaed; overflow: hidden; }
 
 .inline-reply-box {

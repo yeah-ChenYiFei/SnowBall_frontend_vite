@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import http from '@/api/http'
 import TagInput from '@/comments/TagInput.vue'
+import PostImageGrid from '@/components/PostImageGrid.vue'
 import type { Result } from '@/types'
 
 const router = useRouter()
@@ -10,7 +11,8 @@ const router = useRouter()
 const formData = ref({
   type: 'FRAGMENT',
   title: '',
-  tags: [] as string[]
+  tags: [] as string[],
+  images: [] as string[]
 })
 
 const content = ref('')
@@ -74,6 +76,11 @@ async function handleSubmit() {
       <div class="mb-3">
         <label class="form-label">标签 (回车添加)</label>
         <TagInput v-model="formData.tags" />
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">图片（可选，最多9张）</label>
+        <PostImageGrid v-model="formData.images" />
       </div>
 
       <div class="mb-3">

@@ -4,6 +4,7 @@ import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import http from '@/api/http'
 import TagInput from '@/comments/TagInput.vue'
+import PostImageGrid from '@/components/PostImageGrid.vue'
 import type { Post } from '@/types'
 
 const route = useRoute()
@@ -15,7 +16,8 @@ const isLoading = ref(true)
 const formData = ref({
   title: '',
   body: '',
-  tags: [] as string[]
+  tags: [] as string[],
+  images: [] as string[]
 })
 
 // 核心：类似 Git commit -m 的变更摘要
@@ -30,6 +32,7 @@ onMounted(async () => {
     formData.value.title = post.title
     formData.value.body = post.body
     formData.value.tags = post.tags || []
+    formData.value.images = post.images || []
   } catch (error: any) {
     message.value = '加载原始内容失败：' + (error.message || '未找到帖子')
   } finally {
@@ -89,6 +92,11 @@ const handleSubmit = async () => {
       <div class="mb-3">
         <label class="form-label">标签</label>
         <TagInput v-model="formData.tags" />
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">图片（可选，最多9张）</label>
+        <PostImageGrid v-model="formData.images" />
       </div>
 
       <div class="mb-3">

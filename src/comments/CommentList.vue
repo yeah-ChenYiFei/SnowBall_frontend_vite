@@ -3,12 +3,17 @@ import { ref, onMounted, computed } from 'vue'
 import http from '@/api/http'
 import { useUserStore } from '@/stores/user'
 import CommentItem from './CommentItem.vue'
+import ImageUploadButton from '@/components/ImageUploadButton.vue'
+import ImageLightbox from '@/components/ImageLightbox.vue'
 import type { Comment } from '@/types'
 
 const props = defineProps<{ postId: number }>()
 const userStore = useUserStore()
 const flatComments = ref<Comment[]>([])
-const newComment = ref('') // 现在只用于发表一级主评论
+const newComment = ref('')
+const commentImageUrl = ref('')
+const lightboxUrl = ref('')
+const showLightbox = ref(false)
 const isLoading = ref(false)
 
 // ✅ 核心状态：记录当前展开的小输入框是属于哪条评论的
@@ -37,11 +42,14 @@ const submitMainComment = async () => {
   if (!newComment.value.trim()) return
   if (!userStore.isLogin()) return alert('请先登录')
   try {
+    const imgUrl = commentImageUrl.value
     await http.post(`/posts/${props.postId}/comments`, {
       body: newComment.value.trim(),
-      parentId: null // 一级评论没有 parentId
+      parentId: null,
+      imageUrl: imgUrl || undefined
     })
     newComment.value = ''
+    commentImageUrl.value = ''
     await loadComments()
   } catch (error: any) { alert(error.message || '评论失败') }
 }
@@ -52,14 +60,15 @@ const handleOpenReply = (id: number | null) => {
 }
 
 // ✅ 接收子组件提交的回复
-const handleSubmitReply = async (parentId: number, body: string) => {
+const handleSubmitReply = async (parentId: number, body: string, imageUrl?: string) => {
   try {
     await http.post(`/posts/${props.postId}/comments`, {
       body: body,
-      parentId: parentId
+      parentId: parentId,
+      imageUrl: imageUrl || undefined
     })
-    activeReplyId.value = null // 提交成功后收起小输入框
-    await loadComments()      // 刷新列表
+    activeReplyId.value = null
+    await loadComments()
   } catch (error: any) { alert(error.message || '回复失败') }
 }
 
@@ -79,9 +88,12 @@ defineExpose({ loadComments })
         rows="3"
         class="comment-textarea"
       ></textarea>
-      <button class="btn-submit" @click="submitMainComment" :disabled="isLoading">
-        发表评论
-      </button>
+      <div class="comment-form-actions">
+        <ImageUploadButton @uploaded="commentImageUrl = $event" />
+        <button class="btn-submit" @click="submitMainComment" :disabled="isLoading">
+          发表评论
+        </button>
+      </div>
     </div>
 
     <!-- 评论树列表 -->
@@ -94,12 +106,14 @@ defineExpose({ loadComments })
         @open-reply="handleOpenReply"
         @submit-reply="handleSubmitReply"
         @refresh="loadComments"
+        @open-lightbox="(url: string) => { lightboxUrl = url; showLightbox = true }"
       />
 
       <div v-if="flatComments.length === 0" class="empty-comments">
         暂无评论，快来说两句吧！
       </div>
     </div>
+    <ImageLightbox :visible="showLightbox" :image-url="lightboxUrl" @close="showLightbox = false" />
   </div>
 </template>
 
@@ -138,8 +152,10 @@ defineExpose({ loadComments })
   box-sizing: border-box;
   margin-bottom: 12px;
 }
+.comment-form-actions {
+  display: flex; align-items: center; gap: 10px; justify-content: flex-end;
+}
 .btn-submit {
-  float: right;
   padding: 8px 24px;
   background: #1a73e8;
   color: white;

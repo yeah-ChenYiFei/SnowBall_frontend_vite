@@ -2,6 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import http from '@/api/http'
+import PostCard from '@/components/PostCard.vue'
 import { useUserStore } from '@/stores/user'
 import type { Post, Inspiration } from '@/types'
 import UserHoverMenu from '@/components/UserHoverMenu.vue'
@@ -159,45 +160,9 @@ onMounted(() => {
       </div>
 
       <div v-else class="post-feed">
-        <article
-          v-for="post in posts"
-          :key="post.id"
-          class="post-card"
-          @click="goToPost(post.id)"
-        >
-          <div class="card-meta-top">
-            <span class="post-date">{{ formatDate(post.createdAt) }}</span>
-          </div>
-
-          <h3 class="card-title">{{ post.title }}</h3>
-          <p class="card-content">{{ truncateText(post.body || '', 200) }}</p>
-
-          <div class="card-footer">
-            <span
-              class="footer-author"
-              @mouseenter.stop="onAuthorEnter($event, post.userId)"
-              @mouseleave="onAuthorLeave"
-            >👤 {{ post.authorName || '匿名' }}</span>
-            <div class="footer-stats">
-              <span class="stat-item">👁️ {{ post.viewCount || 0 }}</span>
-              <button
-                class="stat-item stat-btn"
-                :class="{ active: post.currentUserReaction === 'LIKE' }"
-                @click="handleReact(post, 'LIKE', $event)"
-              >
-                👍 {{ post.likeCount || 0 }}
-              </button>
-              <button
-                class="stat-item stat-btn"
-                :class="{ active: post.currentUserReaction === 'DISLIKE' }"
-                @click="handleReact(post, 'DISLIKE', $event)"
-              >
-                👎 {{ post.dislikeCount || 0 }}
-              </button>
-              <span class="stat-item">💬 {{ post.commentCount || 0 }}</span>
-            </div>
-          </div>
-        </article>
+        <div v-for="(post, idx) in posts" :key="post.id" class="staggered-card">
+          <PostCard :post="post" :image-position="idx % 2 === 0 ? 'left' : 'right'" />
+        </div>
       </div>
     </div>
 
@@ -338,25 +303,16 @@ onMounted(() => {
 
 /* Post Cards */
 .post-feed {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
 }
 
-.post-card {
-  background: #fff;
-  padding: 20px 24px;
-  border-radius: 12px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
-  cursor: pointer;
-  transition: transform 0.2s, box-shadow 0.2s;
-  border: 1px solid #f1f3f4;
-}
+.staggered-card:nth-child(even) { margin-top: 60px; }
 
-.post-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(0,0,0,0.08);
-  border-color: #e8eaed;
+@media (max-width: 860px) {
+  .post-feed { grid-template-columns: 1fr; }
+  .staggered-card:nth-child(even) { margin-top: 0; }
 }
 
 .card-meta-top {

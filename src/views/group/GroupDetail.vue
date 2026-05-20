@@ -4,6 +4,9 @@ import { useRouter, useRoute } from 'vue-router'
 import http from '@/api/http'
 import { useUserStore } from '@/stores/user'
 import { useFriendStore } from '@/stores/friend'
+import UserAvatar from '@/components/UserAvatar.vue'
+import ImageUploadButton from '@/components/ImageUploadButton.vue'
+import ImageLightbox from '@/components/ImageLightbox.vue'
 import type { GroupDetail, GroupMemberInfo, GroupMessage, UserProfileVO, ChainDetailVO, WritingBattle, BattleEntry } from '@/types'
 
 const router = useRouter()
@@ -19,6 +22,9 @@ const messages = ref<GroupMessage[]>([])
 const inputText = ref('')
 const isLoading = ref(false)
 const isSending = ref(false)
+const pendingImageUrl = ref('')
+const lightboxUrl = ref('')
+const showLightbox = ref(false)
 const messageArea = ref<HTMLElement | null>(null)
 
 // Deduplicate activity cards: only show latest CHAIN/BATTLE message per refId
@@ -163,20 +169,26 @@ async function scrollToBottom() {
 watch(messages, () => scrollToBottom(), { deep: false })
 
 // ---- Send message ----
-async function sendMessage() {
+async function sendMessage(imageUrl?: string) {
   const text = inputText.value.trim()
-  if (!text) return
+  if (!text && !imageUrl) return
   isSending.value = true
   try {
-    const body: any = { body: text, type: 'CHAT' }
+    const body: any = { body: text || '[图片]', type: 'CHAT' }
+    if (imageUrl) body.imageUrl = imageUrl
     if (quoteTarget.value) {
-      body.body = `> ${quoteTarget.value.senderName}: ${quoteTarget.value.body}\n\n${text}`
+      body.body = `> ${quoteTarget.value.senderName}: ${quoteTarget.value.body}\n\n${text || ''}`
       quoteTarget.value = null
     }
     await http.post(`/groups/${groupId.value}/messages`, body)
     inputText.value = ''
+    pendingImageUrl.value = ''
   } catch (e: any) { alert(e.message || '发送失败') }
   finally { isSending.value = false }
+}
+
+function onImageUploaded(url: string) {
+  sendMessage(url)
 }
 
 function onInputKeydown(e: KeyboardEvent) {
@@ -364,8 +376,6 @@ function toggleBattleParticipant(userId: number) {
 // ---- Helpers ----
 function goBack() { router.push('/groups') }
 
-const avatarColors = ['#1a73e8','#d93025','#1e8e3e','#f9ab00','#9334e6','#185abc','#c5221f','#137333']
-function avatarColor(id: number): string { return avatarColors[id % avatarColors.length] }
 
 function formatTime(iso: string): string {
   return new Date(iso).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
@@ -506,13 +516,21 @@ function formatDate(iso: string): string {
 
           <!-- ========== Normal CHAT message ========== -->
           <div v-else :class="['message-row', { 'is-mine': msg.senderId === currentUserId }]" @contextmenu="onMessageContextMenu($event, msg)">
-            <div class="msg-avatar" :style="{ background: avatarColor(msg.senderId) }" @click="showUserProfile($event, msg.senderId)">{{ msg.senderName?.charAt(0) || '?' }}</div>
+            <UserAvatar
+              :username="msg.senderName || '?'"
+              :size="36"
+              class="msg-avatar"
+              @click="showUserProfile($event, msg.senderId)"
+            />
             <div class="msg-content">
               <div class="msg-header">
                 <span class="msg-sender" @click="showUserProfile($event, msg.senderId)">{{ msg.senderName }}</span>
                 <span class="msg-time">{{ formatTime(msg.createdAt) }}</span>
               </div>
-              <div class="msg-body">{{ msg.body }}</div>
+              <div class="msg-body">
+                <img v-if="msg.imageUrl" :src="msg.imageUrl" class="msg-image" @click="lightboxUrl = msg.imageUrl; showLightbox = true" />
+                {{ msg.body }}
+              </div>
             </div>
           </div>
         </template>
@@ -526,7 +544,7 @@ function formatDate(iso: string): string {
                :class="['member-item', { 'is-admin': member.role === 'admin' }]"
                @click="showUserProfile($event, member.userId)"
                @contextmenu="onMemberContextMenu($event, member)">
-            <div class="member-avatar" :style="{ background: avatarColor(member.userId) }">{{ member.username.charAt(0) }}</div>
+            <UserAvatar :username="member.username" :size="32" class="member-avatar" />
             <span class="member-name">{{ member.username }}</span>
             <span v-if="member.role === 'admin'" class="admin-badge">群主</span>
           </div>
@@ -539,12 +557,13 @@ function formatDate(iso: string): string {
       <div class="func-buttons">
         <button class="func-btn" @click="showChainModal = true" title="滚雪球 - 发起故事接龙"><span class="func-icon">&#x1F3D4;</span> 滚雪球</button>
         <button class="func-btn" @click="showBattleModal = true" title="打雪仗 - 发起写作擂台"><span class="func-icon">&#x2744;</span> 打雪仗</button>
+        <ImageUploadButton @uploaded="onImageUploaded" />
         <div v-if="quoteTarget" class="quote-bar">回复 {{ quoteTarget.senderName }}: <span class="quote-preview">{{ quoteTarget.body?.substring(0, 50) }}...</span><button class="quote-cancel" @click="quoteTarget = null">✕</button></div>
         <div class="func-spacer"></div>
       </div>
       <div class="input-row">
         <input v-model="inputText" type="text" class="chat-input" placeholder="输入消息..." @keydown="onInputKeydown" />
-        <button class="btn-send" @click="sendMessage" :disabled="isSending || !inputText.trim()">发送</button>
+        <button class="btn-send" @click="sendMessage()" :disabled="isSending || (!inputText.trim() && !pendingImageUrl)">发送</button>
       </div>
     </div>
 
@@ -566,7 +585,12 @@ function formatDate(iso: string): string {
           <div v-if="profilePopup.loading" class="profile-loading">加载中...</div>
           <template v-else-if="profilePopup.user">
             <div class="profile-header">
-              <div class="profile-avatar-big" :style="{ background: avatarColor(profilePopup.user.user.id) }">{{ profilePopup.user.user.username.charAt(0) }}</div>
+              <UserAvatar
+                :username="profilePopup.user.user.username"
+                :avatar-url="profilePopup.user.user.avatarUrl"
+                :size="56"
+                class="profile-avatar-big"
+              />
               <div><div class="profile-username">{{ profilePopup.user.user.username }}</div><div class="profile-role">{{ profilePopup.user.user.role || '用户' }}</div></div>
             </div>
             <!-- Action buttons -->
@@ -642,6 +666,7 @@ function formatDate(iso: string): string {
         </div>
       </div>
     </Teleport>
+    <ImageLightbox :visible="showLightbox" :image-url="lightboxUrl" @close="showLightbox = false" />
   </div>
 </template>
 
@@ -725,7 +750,7 @@ function formatDate(iso: string): string {
 /* Normal chat message */
 .message-row { display: flex; gap: 10px; margin-bottom: 16px; align-items: flex-start; }
 .message-row.is-mine { flex-direction: row-reverse; }
-.msg-avatar { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 14px; font-weight: 600; flex-shrink: 0; cursor: pointer; }
+.msg-avatar { cursor: pointer; /* sizing handled by UserAvatar */ }
 .msg-content { max-width: 65%; }
 .msg-header { display: flex; align-items: baseline; gap: 8px; margin-bottom: 4px; }
 .msg-sender { font-size: 13px; font-weight: 500; color: #5f6368; cursor: pointer; }
@@ -733,6 +758,7 @@ function formatDate(iso: string): string {
 .msg-time { font-size: 11px; color: #bdc1c6; }
 .msg-body { background: #fff; padding: 10px 14px; border-radius: 12px; font-size: 14px; line-height: 1.6; color: #202124; word-break: break-word; white-space: pre-wrap; box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
 .message-row.is-mine .msg-body { background: #e8f0fe; }
+.msg-image { max-width: 240px; max-height: 200px; border-radius: 8px; cursor: pointer; object-fit: cover; display: block; margin-bottom: 6px; }
 
 /* Sidebar */
 .member-sidebar { width: 200px; background: #fff; border-left: 1px solid #e8eaed; padding: 16px; overflow-y: auto; flex-shrink: 0; }
@@ -740,7 +766,7 @@ function formatDate(iso: string): string {
 .member-list { display: flex; flex-direction: column; gap: 4px; }
 .member-item { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 8px; cursor: pointer; transition: background 0.15s; }
 .member-item:hover { background: #f1f3f4; }
-.member-avatar { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 12px; font-weight: 600; flex-shrink: 0; }
+.member-avatar { /* sizing handled by UserAvatar */ }
 .member-name { font-size: 13px; color: #202124; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .admin-badge { font-size: 10px; background: #fce8e6; color: #d93025; padding: 1px 6px; border-radius: 8px; flex-shrink: 0; }
 
@@ -775,7 +801,7 @@ function formatDate(iso: string): string {
 .profile-popup { position: fixed; z-index: 2501; background: #fff; border-radius: 12px; box-shadow: 0 8px 32px rgba(0,0,0,0.15); padding: 20px; min-width: 260px; max-width: 320px; }
 .profile-loading { text-align: center; color: #999; padding: 20px; font-size: 13px; }
 .profile-header { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
-.profile-avatar-big { width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 18px; font-weight: 600; flex-shrink: 0; }
+.profile-avatar-big { /* sizing handled by UserAvatar */ }
 .profile-username { font-size: 16px; font-weight: 600; color: #202124; }
 .profile-role { font-size: 12px; color: #999; }
 .profile-actions { display: flex; gap: 8px; margin-bottom: 10px; }

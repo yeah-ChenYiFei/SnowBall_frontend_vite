@@ -44,6 +44,7 @@ export interface Post {
   dislikeCount?: number
   viewCount?: number
   currentUserReaction?: 'LIKE' | 'DISLIKE' | null
+  images?: string[]
 }
 
 // 4. 评论模块（支持两级嵌套）
@@ -56,6 +57,7 @@ export interface Comment {
   likeCount: number
   dislikeCount: number
   currentUserReaction: string | null
+  imageUrl?: string
   createdAt: string
   authorName?: string
   children?: Comment[]
@@ -137,6 +139,7 @@ export interface GroupMessage {
   senderId: number
   senderName: string
   body: string
+  imageUrl?: string
   type: string // 'CHAT' | 'CHAIN_START' | 'CHAIN_SEGMENT' | 'BATTLE_START' | 'BATTLE_ENTRY' | 'SYSTEM'
   refId?: number
   refType?: string // 'CHAIN' | 'BATTLE'
@@ -316,6 +319,7 @@ export interface PrivateMessage {
   receiverId: number
   senderName: string
   body: string
+  imageUrl?: string
   isRead: boolean
   createdAt: string
 }
