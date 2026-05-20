@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useUserStore } from './stores/user'
 import { useRouter, useRoute } from 'vue-router'
 import http from '@/api/http'
@@ -7,6 +7,8 @@ import http from '@/api/http'
 const userStore = useUserStore()
 const router = useRouter()
 const route = useRoute()
+
+const isAuthPage = computed(() => route.path === '/login' || route.path === '/register')
 
 const showWildMenu = ref(false)
 const showCreateMenu = ref(false)
@@ -94,6 +96,10 @@ function handleLogout() {
 </script>
 
 <template>
+  <template v-if="isAuthPage">
+    <router-view />
+  </template>
+  <template v-else>
   <!-- 雪球平台导航栏 -->
   <header class="snowball-header">
     <div class="header-content">
@@ -216,6 +222,7 @@ function handleLogout() {
   <main class="page-content">
     <router-view />
   </main>
+  </template>
 </template>
 
 <style scoped>
