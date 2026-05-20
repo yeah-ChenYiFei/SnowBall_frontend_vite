@@ -102,7 +102,10 @@ function avatarColor(id: number): string { return avatarColors[id % avatarColors
     <div v-else class="group-grid">
       <div v-for="g in myGroups" :key="g.id" class="group-card" @click="goToGroup(g.id)">
         <div class="card-top">
-          <div class="card-avatar" :style="{ background: avatarColor(g.id) }">{{ g.name.charAt(0) }}</div>
+          <div class="card-avatar">
+            <img v-if="g.avatarUrl" :src="g.avatarUrl" class="card-avatar-img" />
+            <span v-else class="card-avatar-letter">{{ g.name.charAt(0) }}</span>
+          </div>
           <div class="card-info">
             <h3 class="card-name">{{ g.name }}</h3>
             <p class="card-desc">{{ g.description || '暂无简介' }}</p>
@@ -185,7 +188,9 @@ function avatarColor(id: number): string { return avatarColors[id % avatarColors
 .group-card { background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; }
 .group-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
 .card-top { display: flex; gap: 14px; margin-bottom: 14px; }
-.card-avatar { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 18px; font-weight: 600; flex-shrink: 0; }
+.card-avatar { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 18px; font-weight: 600; flex-shrink: 0; overflow: hidden; }
+.card-avatar-img { width: 100%; height: 100%; object-fit: cover; }
+.card-avatar-letter { background: linear-gradient(135deg, #1a73e8, #4285f4); width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
 .card-info { overflow: hidden; }
 .card-name { font-size: 16px; font-weight: 600; color: #202124; margin: 0 0 4px 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .card-desc { font-size: 13px; color: #5f6368; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

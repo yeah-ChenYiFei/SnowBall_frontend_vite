@@ -25,7 +25,15 @@ const isSending = ref(false)
 const pendingImageUrl = ref('')
 const lightboxUrl = ref('')
 const showLightbox = ref(false)
+const editingName = ref(false)
+const editNameText = ref('')
+const groupAvatarInput = ref<HTMLInputElement | null>(null)
 const messageArea = ref<HTMLElement | null>(null)
+
+const isAdmin = computed(() => {
+  return group.value?.creatorId === userStore.userInfo?.id ||
+    group.value?.members?.some(m => m.userId === userStore.userInfo?.id && m.role === 'admin')
+})
 
 // Deduplicate activity cards: only show latest CHAIN/BATTLE message per refId
 const displayMessages = computed(() => {
@@ -169,13 +177,13 @@ async function scrollToBottom() {
 watch(messages, () => scrollToBottom(), { deep: false })
 
 // ---- Send message ----
-async function sendMessage(imageUrl?: string) {
+async function sendMessage() {
   const text = inputText.value.trim()
-  if (!text && !imageUrl) return
+  if (!text && !pendingImageUrl.value) return
   isSending.value = true
   try {
-    const body: any = { body: text || '[图片]', type: 'CHAT' }
-    if (imageUrl) body.imageUrl = imageUrl
+    const body: any = { body: text || undefined, type: 'CHAT' }
+    if (pendingImageUrl.value) body.imageUrl = pendingImageUrl.value
     if (quoteTarget.value) {
       body.body = `> ${quoteTarget.value.senderName}: ${quoteTarget.value.body}\n\n${text || ''}`
       quoteTarget.value = null
@@ -188,7 +196,53 @@ async function sendMessage(imageUrl?: string) {
 }
 
 function onImageUploaded(url: string) {
-  sendMessage(url)
+  pendingImageUrl.value = url
+}
+
+function removePendingImage() {
+  pendingImageUrl.value = ''
+}
+
+function startEditName() {
+  editNameText.value = group.value?.name || ''
+  editingName.value = true
+}
+
+async function saveGroupName() {
+  if (!editNameText.value.trim()) return
+  try {
+    await http.put(`/groups/${groupId.value}`, { name: editNameText.value.trim() })
+    if (group.value) group.value.name = editNameText.value.trim()
+    editingName.value = false
+  } catch (e: any) { alert(e.message || '修改失败') }
+}
+
+function triggerGroupAvatar() {
+  groupAvatarInput.value?.click()
+}
+
+async function onGroupAvatarChange(e: Event) {
+  const input = e.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+  if (!file.type.startsWith('image/')) { alert('请选择图片文件'); return }
+  try {
+    const fd = new FormData()
+    fd.append('file', file)
+    const res = await http.post('/upload', fd, { headers: { 'Content-Type': 'multipart/form-data' } })
+    const url = (res.data as any).url
+    await http.put(`/groups/${groupId.value}`, { avatarUrl: url })
+    if (group.value) group.value.avatarUrl = url
+  } catch (e: any) { alert(e.message || '上传失败') }
+  finally { input.value = '' }
+}
+
+async function toggleSearchable(e: Event) {
+  const checked = (e.target as HTMLInputElement).checked
+  try {
+    await http.put(`/groups/${groupId.value}`, { isSearchable: checked })
+    if (group.value) group.value.isSearchable = checked
+  } catch (e: any) { alert(e.message || '修改失败') }
 }
 
 function onInputKeydown(e: KeyboardEvent) {
@@ -392,9 +446,31 @@ function formatDate(iso: string): string {
       <button class="btn-back" @click="goBack">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
       </button>
-      <div class="group-header-info">
-        <h2 class="group-name">{{ group?.name || '加载中...' }}</h2>
-        <span class="group-meta">{{ group?.memberCount || 0 }} 位成员</span>
+      <div class="group-header-main">
+        <div class="group-avatar-area" @click="isAdmin ? triggerGroupAvatar() : null" :title="isAdmin ? '点击更换群头像' : ''">
+          <img v-if="group?.avatarUrl" :src="group.avatarUrl" class="group-avatar-img" />
+          <div v-else class="group-avatar-placeholder">{{ group?.name?.charAt(0) || 'G' }}</div>
+          <div v-if="isAdmin" class="group-avatar-overlay">📷</div>
+        </div>
+        <input ref="groupAvatarInput" type="file" accept="image/*" style="display:none" @change="onGroupAvatarChange" />
+        <div class="group-header-info">
+          <div class="group-name-row">
+            <h2 v-if="!editingName" class="group-name" @click="isAdmin ? startEditName() : null" :class="{ editable: isAdmin }">{{ group?.name || '加载中...' }}</h2>
+            <div v-else class="group-name-edit">
+              <input v-model="editNameText" class="name-input" maxlength="100" @keyup.enter="saveGroupName" />
+              <button class="btn-save-sm" @click="saveGroupName">保存</button>
+              <button class="btn-cancel-sm" @click="editingName = false">取消</button>
+            </div>
+          </div>
+          <div class="group-meta-row">
+            <span class="group-number">#{{ group?.groupNumber ?? group?.id }}</span>
+            <span class="group-meta">{{ group?.memberCount || 0 }} 位成员</span>
+            <label v-if="isAdmin" class="search-toggle" title="允许搜索该群组">
+              <input type="checkbox" :checked="group?.isSearchable" @change="toggleSearchable" />
+              <span>可搜索</span>
+            </label>
+          </div>
+        </div>
       </div>
       <div class="header-spacer"></div>
     </div>
@@ -518,6 +594,7 @@ function formatDate(iso: string): string {
           <div v-else :class="['message-row', { 'is-mine': msg.senderId === currentUserId }]" @contextmenu="onMessageContextMenu($event, msg)">
             <UserAvatar
               :username="msg.senderName || '?'"
+              :avatar-url="msg.senderAvatarUrl"
               :size="36"
               class="msg-avatar"
               @click="showUserProfile($event, msg.senderId)"
@@ -544,7 +621,7 @@ function formatDate(iso: string): string {
                :class="['member-item', { 'is-admin': member.role === 'admin' }]"
                @click="showUserProfile($event, member.userId)"
                @contextmenu="onMemberContextMenu($event, member)">
-            <UserAvatar :username="member.username" :size="32" class="member-avatar" />
+            <UserAvatar :username="member.username" :avatar-url="member.avatarUrl" :size="32" class="member-avatar" />
             <span class="member-name">{{ member.username }}</span>
             <span v-if="member.role === 'admin'" class="admin-badge">群主</span>
           </div>
@@ -560,6 +637,10 @@ function formatDate(iso: string): string {
         <ImageUploadButton @uploaded="onImageUploaded" />
         <div v-if="quoteTarget" class="quote-bar">回复 {{ quoteTarget.senderName }}: <span class="quote-preview">{{ quoteTarget.body?.substring(0, 50) }}...</span><button class="quote-cancel" @click="quoteTarget = null">✕</button></div>
         <div class="func-spacer"></div>
+      </div>
+      <div v-if="pendingImageUrl" class="image-preview-row">
+        <img :src="pendingImageUrl" class="preview-thumb" @click="lightboxUrl = pendingImageUrl; showLightbox = true" />
+        <button class="preview-remove" @click="removePendingImage()">&times;</button>
       </div>
       <div class="input-row">
         <input v-model="inputText" type="text" class="chat-input" placeholder="输入消息..." @keydown="onInputKeydown" />
@@ -675,9 +756,27 @@ function formatDate(iso: string): string {
 .group-header { display: flex; align-items: center; gap: 12px; padding: 12px 20px; background: #fff; border-bottom: 1px solid #e8eaed; flex-shrink: 0; }
 .btn-back { display: flex; align-items: center; background: none; border: none; color: #5f6368; cursor: pointer; padding: 6px; border-radius: 6px; transition: all 0.2s; }
 .btn-back:hover { color: #1a73e8; background: #e8f0fe; }
-.group-header-info { display: flex; align-items: baseline; gap: 12px; }
+.group-header-main { display: flex; align-items: center; gap: 14px; }
+.group-avatar-area { position: relative; width: 48px; height: 48px; border-radius: 12px; overflow: hidden; cursor: default; flex-shrink: 0; }
+.group-avatar-area:hover .group-avatar-overlay { opacity: 1; }
+.group-avatar-img { width: 100%; height: 100%; object-fit: cover; }
+.group-avatar-placeholder { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #1a73e8, #4285f4); color: #fff; font-size: 22px; font-weight: 700; }
+.group-avatar-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.35); display: flex; align-items: center; justify-content: center; font-size: 16px; opacity: 0; transition: opacity 0.2s; }
+.group-header-info { display: flex; flex-direction: column; gap: 4px; }
+.group-name-row { display: flex; align-items: center; }
 .group-name { font-size: 18px; font-weight: 600; color: #202124; margin: 0; }
+.group-name.editable { cursor: pointer; }
+.group-name.editable:hover { color: #1a73e8; }
+.group-name-edit { display: flex; gap: 6px; align-items: center; }
+.name-input { padding: 4px 8px; border: 1px solid #dadce0; border-radius: 6px; font-size: 16px; outline: none; width: 160px; }
+.name-input:focus { border-color: #1a73e8; }
+.btn-save-sm { padding: 4px 10px; background: #1a73e8; color: #fff; border: none; border-radius: 4px; font-size: 12px; cursor: pointer; }
+.btn-cancel-sm { padding: 4px 10px; background: #fff; color: #5f6368; border: 1px solid #dadce0; border-radius: 4px; font-size: 12px; cursor: pointer; }
+.group-meta-row { display: flex; align-items: center; gap: 12px; }
+.group-number { font-size: 12px; color: #999; background: #f1f3f4; padding: 1px 8px; border-radius: 10px; }
 .group-meta { font-size: 13px; color: #999; }
+.search-toggle { display: flex; align-items: center; gap: 4px; font-size: 12px; color: #5f6368; cursor: pointer; }
+.search-toggle input { cursor: pointer; }
 .header-spacer { flex: 1; }
 .group-body { display: flex; flex: 1; overflow: hidden; }
 
@@ -759,6 +858,9 @@ function formatDate(iso: string): string {
 .msg-body { background: #fff; padding: 10px 14px; border-radius: 12px; font-size: 14px; line-height: 1.6; color: #202124; word-break: break-word; white-space: pre-wrap; box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
 .message-row.is-mine .msg-body { background: #e8f0fe; }
 .msg-image { max-width: 240px; max-height: 200px; border-radius: 8px; cursor: pointer; object-fit: cover; display: block; margin-bottom: 6px; }
+.image-preview-row { display: flex; align-items: flex-start; gap: 6px; padding: 0 20px; margin-bottom: 6px; }
+.preview-thumb { max-width: 120px; max-height: 80px; border-radius: 6px; object-fit: cover; cursor: pointer; }
+.preview-remove { background: rgba(0,0,0,0.4); color: #fff; border: none; border-radius: 50%; width: 18px; height: 18px; font-size: 12px; cursor: pointer; flex-shrink: 0; line-height: 1; }
 
 /* Sidebar */
 .member-sidebar { width: 200px; background: #fff; border-left: 1px solid #e8eaed; padding: 16px; overflow-y: auto; flex-shrink: 0; }

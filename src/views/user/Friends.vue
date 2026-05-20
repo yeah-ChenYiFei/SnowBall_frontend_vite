@@ -54,13 +54,13 @@ function scrollToBottom() {
   }
 }
 
-async function sendMessage(imageUrl?: string) {
+async function sendMessage() {
   const body = newMsg.value.trim()
-  if (!body && !imageUrl) return
+  if (!body && !pendingImageUrl.value) return
   if (!selectedFriend.value) return
   try {
-    const payload: any = { body: body || '[图片]' }
-    if (imageUrl) payload.imageUrl = imageUrl
+    const payload: any = { body: body || undefined }
+    if (pendingImageUrl.value) payload.imageUrl = pendingImageUrl.value
     await http.post(`/chat/${selectedFriend.value.userId}`, payload)
     newMsg.value = ''
     pendingImageUrl.value = ''
@@ -71,7 +71,11 @@ async function sendMessage(imageUrl?: string) {
 }
 
 function onImageUploaded(url: string) {
-  sendMessage(url)
+  pendingImageUrl.value = url
+}
+
+function removePendingImage() {
+  pendingImageUrl.value = ''
 }
 
 function goToProfile(userId: number) {
@@ -200,15 +204,23 @@ onUnmounted(() => {
           </div>
         </div>
         <div class="chat-input-area">
-          <input
-            v-model="newMsg"
-            type="text"
-            class="chat-input"
-            placeholder="输入消息..."
-            @keyup.enter="sendMessage()"
-          />
-          <ImageUploadButton @uploaded="onImageUploaded" />
-          <button class="btn-send" @click="sendMessage()">发送</button>
+          <div class="input-full">
+            <div v-if="pendingImageUrl" class="image-preview-row">
+              <img :src="pendingImageUrl" class="preview-thumb" @click="lightboxUrl = pendingImageUrl; showLightbox = true" />
+              <button class="preview-remove" @click="removePendingImage()">&times;</button>
+            </div>
+            <div class="input-row">
+              <input
+                v-model="newMsg"
+                type="text"
+                class="chat-input"
+                placeholder="输入消息..."
+                @keyup.enter="sendMessage()"
+              />
+              <ImageUploadButton @uploaded="onImageUploaded" />
+              <button class="btn-send" @click="sendMessage()">发送</button>
+            </div>
+          </div>
         </div>
       </template>
       <template v-else>
@@ -323,6 +335,11 @@ onUnmounted(() => {
   max-width: 200px; max-height: 180px; border-radius: 8px;
   cursor: pointer; object-fit: cover; display: block; margin-bottom: 6px;
 }
+.input-full { flex: 1; display: flex; flex-direction: column; gap: 0; }
+.image-preview-row { display: flex; align-items: flex-start; gap: 6px; margin-bottom: 6px; }
+.preview-thumb { max-width: 120px; max-height: 80px; border-radius: 6px; object-fit: cover; cursor: pointer; }
+.preview-remove { background: rgba(0,0,0,0.4); color: #fff; border: none; border-radius: 50%; width: 18px; height: 18px; font-size: 12px; cursor: pointer; flex-shrink: 0; line-height: 1; }
+.input-row { display: flex; gap: 10px; align-items: center; }
 
 .chat-input-area { display: flex; gap: 10px; padding: 14px 20px; border-top: 1px solid #e8eaed; background: #fff; }
 .chat-input {

@@ -24,7 +24,7 @@ function onAuthorEnter(e: MouseEvent, userId: number) {
   showHoverMenu.value = true
 }
 function onAuthorLeave() {
-  hoverTimer = setTimeout(() => { showHoverMenu.value = false }, 300)
+  hoverTimer = setTimeout(() => { showHoverMenu.value = false }, 500)
 }
 
 const posts = ref<Post[]>([])

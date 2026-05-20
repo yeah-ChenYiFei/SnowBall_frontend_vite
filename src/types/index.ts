@@ -108,6 +108,10 @@ export interface Group {
   creatorId: number
   name: string
   description: string
+  avatarUrl?: string
+  groupNumber?: number
+  isPrivate?: boolean
+  isSearchable?: boolean
   createdAt: string
   creatorName?: string
   memberCount?: number
@@ -122,6 +126,9 @@ export interface GroupDetail {
   creatorId: number
   creatorName: string
   isPrivate: boolean
+  isSearchable: boolean
+  avatarUrl?: string
+  groupNumber?: number
   memberCount: number
   members: GroupMemberInfo[]
   createdAt: string
@@ -130,6 +137,7 @@ export interface GroupDetail {
 export interface GroupMemberInfo {
   userId: number
   username: string
+  avatarUrl?: string
   role: string // 'admin' | 'member'
 }
 
@@ -138,6 +146,7 @@ export interface GroupMessage {
   groupId: number
   senderId: number
   senderName: string
+  senderAvatarUrl?: string
   body: string
   imageUrl?: string
   type: string // 'CHAT' | 'CHAIN_START' | 'CHAIN_SEGMENT' | 'BATTLE_START' | 'BATTLE_ENTRY' | 'SYSTEM'
@@ -187,12 +196,16 @@ export interface UserProfileVO {
   user: UserVO
   posts: Post[]
   books: Book[]
+  stats?: Record<string, number>
 }
 
 export interface UserVO {
   id: number
   username: string
+  role?: string
   avatarUrl?: string
+  signature?: string
+  createdAt?: string
 }
 
 // 7. 世界观 / 设定

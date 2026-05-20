@@ -32,7 +32,7 @@ const loaded = ref(false)
 const rect = props.triggerEl.getBoundingClientRect()
 
 const posX = ref(Math.min(rect.left, window.innerWidth - 260))
-const posY = ref(rect.bottom + 4)
+const posY = ref(rect.bottom - 2)
 
 let closeTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -69,7 +69,7 @@ function onCardEnter() {
 }
 
 function onCardLeave() {
-  closeTimer = setTimeout(() => emit('close'), 300)
+  closeTimer = setTimeout(() => emit('close'), 500)
 }
 
 function goToProfile() {

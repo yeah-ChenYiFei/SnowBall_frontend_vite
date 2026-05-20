@@ -79,7 +79,7 @@ async function handleSend() {
   inputText.value = ''
   const imgUrl = pendingImageUrl.value
   pendingImageUrl.value = ''
-  await chatStore.sendMessage(body || '[图片]', imgUrl || undefined)
+  await chatStore.sendMessage(body, imgUrl || undefined)
   setTimeout(() => {
     if (chatEl.value) {
       chatEl.value.scrollTop = chatEl.value.scrollHeight
@@ -89,7 +89,10 @@ async function handleSend() {
 
 function onImageUploaded(url: string) {
   pendingImageUrl.value = url
-  handleSend()
+}
+
+function removePendingImage() {
+  pendingImageUrl.value = ''
 }
 
 function handleKeydown(e: KeyboardEvent) {
@@ -157,17 +160,25 @@ function goBack() {
         </div>
 
         <div class="chat-input-bar">
-          <textarea
-            v-model="inputText"
-            class="chat-input"
-            placeholder="输入消息..."
-            rows="2"
-            @keydown="handleKeydown"
-          ></textarea>
-          <ImageUploadButton @uploaded="onImageUploaded" />
-          <button class="btn-send" @click="handleSend" :disabled="!inputText.trim() && !pendingImageUrl">
-            发送
-          </button>
+          <div class="input-wrapper">
+            <div v-if="pendingImageUrl" class="image-preview-row">
+              <img :src="pendingImageUrl" class="preview-thumb" @click="lightboxUrl = pendingImageUrl; showLightbox = true" />
+              <button class="preview-remove" @click="removePendingImage()">&times;</button>
+            </div>
+            <div class="input-row">
+              <textarea
+                v-model="inputText"
+                class="chat-input"
+                placeholder="输入消息..."
+                rows="2"
+                @keydown="handleKeydown"
+              ></textarea>
+              <ImageUploadButton @uploaded="onImageUploaded" />
+              <button class="btn-send" @click="handleSend" :disabled="!inputText.trim() && !pendingImageUrl">
+                发送
+              </button>
+            </div>
+          </div>
         </div>
       </template>
       <template v-else>
@@ -290,6 +301,11 @@ function goBack() {
   max-width: 240px; max-height: 200px; border-radius: 8px;
   cursor: pointer; object-fit: cover; display: block; margin-bottom: 4px;
 }
+.input-wrapper { flex: 1; display: flex; flex-direction: column; gap: 0; }
+.image-preview-row { display: flex; align-items: flex-start; gap: 6px; margin-bottom: 6px; }
+.preview-thumb { max-width: 120px; max-height: 80px; border-radius: 6px; object-fit: cover; cursor: pointer; }
+.preview-remove { background: rgba(0,0,0,0.4); color: #fff; border: none; border-radius: 50%; width: 18px; height: 18px; font-size: 12px; cursor: pointer; flex-shrink: 0; line-height: 1; }
+.input-row { display: flex; gap: 10px; align-items: flex-end; }
 .msg-time {
   font-size: 11px;
   color: #999;

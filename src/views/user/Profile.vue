@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import http from '@/api/http'
 import { useUserStore } from '@/stores/user'
 import UserAvatar from '@/components/UserAvatar.vue'
+import ImageLightbox from '@/components/ImageLightbox.vue'
 import type { UserProfileFull, ContributionDay, RecentProject, BrowsingHistory, Activity, PublicChain } from '@/types'
 
 const route = useRoute()
@@ -15,6 +16,12 @@ const isLoading = ref(true)
 const showAllProjects = ref(false)
 const hoveredDay = ref<ContributionDay | null>(null)
 const hoverPos = ref({ x: 0, y: 0 })
+const editingSignature = ref(false)
+const signatureText = ref('')
+const uploadingAvatar = ref(false)
+const avatarInput = ref<HTMLInputElement | null>(null)
+const lightboxUrl = ref('')
+const showLightbox = ref(false)
 
 const userId = computed(() => {
   const id = route.params.userId as string
@@ -101,7 +108,7 @@ async function loadProfile() {
       contributions: Array.from(contribMap.values()).sort((a, b) => a.date.localeCompare(b.date)),
       browsingHistory,
       activities: chainActivities,
-      stats: {
+      stats: userData?.stats || {
         posts: posts.length,
         worlds: 0,
         articles: 0,
@@ -113,6 +120,46 @@ async function loadProfile() {
   } finally {
     isLoading.value = false
   }
+}
+
+function triggerAvatarUpload() {
+  if (!isSelf.value) return
+  avatarInput.value?.click()
+}
+
+async function onAvatarFileChange(e: Event) {
+  const input = e.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+  if (!file.type.startsWith('image/')) { alert('请选择图片文件'); return }
+  if (file.size > 10 * 1024 * 1024) { alert('图片不能超过10MB'); return }
+  uploadingAvatar.value = true
+  try {
+    const fd = new FormData()
+    fd.append('file', file)
+    const res = await http.post('/users/avatar', fd, { headers: { 'Content-Type': 'multipart/form-data' } })
+    const newUrl = res.data.avatarUrl
+    if (profile.value) profile.value.user.avatarUrl = newUrl
+    if (userStore.userInfo) userStore.userInfo.avatarUrl = newUrl
+  } catch (e: any) { alert(e.message || '上传失败') }
+  finally { uploadingAvatar.value = false; input.value = '' }
+}
+
+function startEditSignature() {
+  signatureText.value = profile.value?.user.signature || ''
+  editingSignature.value = true
+}
+
+async function saveSignature() {
+  try {
+    await http.put('/users/profile', { signature: signatureText.value })
+    if (profile.value) profile.value.user.signature = signatureText.value
+    editingSignature.value = false
+  } catch (e: any) { alert(e.message || '保存失败') }
+}
+
+function cancelEditSignature() {
+  editingSignature.value = false
 }
 
 function goToProject(p: RecentProject) {
@@ -253,14 +300,30 @@ watch(() => route.params.userId, loadProfile)
       <!-- Left Column: User Info -->
       <aside class="profile-left">
         <div class="user-card">
-          <UserAvatar
-            :username="profile.user.username"
-            :avatar-url="profile.user.avatarUrl"
-            :size="88"
-            class="user-avatar-lg"
-          />
+          <div class="avatar-wrapper" :class="{ clickable: isSelf }" @click="triggerAvatarUpload" :title="isSelf ? '点击更换头像' : ''">
+            <UserAvatar
+              :username="profile.user.username"
+              :avatar-url="profile.user.avatarUrl"
+              :size="88"
+              class="user-avatar-lg"
+            />
+            <div v-if="isSelf" class="avatar-overlay"><span class="upload-hint">📷</span></div>
+          </div>
+          <input ref="avatarInput" type="file" accept="image/*" style="display:none" @change="onAvatarFileChange" />
           <h2 class="user-name">{{ profile.user.username }}</h2>
-          <p class="user-signature">{{ profile.user.signature || '这个人很懒，还没有写签名...' }}</p>
+
+          <div class="signature-area">
+            <template v-if="!editingSignature">
+              <p class="user-signature">{{ profile.user.signature || '这个人很懒，还没有写签名...' }}</p>
+              <button v-if="isSelf" class="btn-edit-signature" @click="startEditSignature" title="编辑签名">✎</button>
+            </template>
+            <div v-else class="signature-edit">
+              <input v-model="signatureText" class="signature-input" placeholder="写一句签名..." maxlength="100" @keyup.enter="saveSignature" />
+              <button class="btn-save-sig" @click="saveSignature">保存</button>
+              <button class="btn-cancel-sig" @click="cancelEditSignature">取消</button>
+            </div>
+          </div>
+
           <div class="user-stats">
             <div class="stat-item">
               <span class="stat-num">{{ profile.stats.posts }}</span>
@@ -425,6 +488,7 @@ watch(() => route.params.userId, loadProfile)
       <p>用户不存在或加载失败</p>
       <router-link to="/">返回广场</router-link>
     </div>
+    <ImageLightbox :visible="showLightbox" :image-url="lightboxUrl" @close="showLightbox = false" />
   </div>
 </template>
 
@@ -465,6 +529,31 @@ watch(() => route.params.userId, loadProfile)
 .user-avatar-lg {
   margin: 0 auto 16px;
 }
+
+.avatar-wrapper { position: relative; display: inline-block; margin: 0 auto 16px; }
+.avatar-wrapper.clickable { cursor: pointer; }
+.avatar-overlay {
+  position: absolute; inset: 0; border-radius: 50%;
+  background: rgba(0,0,0,0); display: flex; align-items: center; justify-content: center;
+  transition: background 0.2s;
+}
+.avatar-wrapper.clickable:hover .avatar-overlay { background: rgba(0,0,0,0.4); }
+.upload-hint { opacity: 0; font-size: 20px; transition: opacity 0.2s; }
+.avatar-wrapper.clickable:hover .upload-hint { opacity: 1; }
+
+.signature-area { position: relative; margin-bottom: 24px; }
+.user-signature { font-size: 13px; color: #999; margin: 0; line-height: 1.5; display: inline; }
+.btn-edit-signature {
+  background: none; border: 1px solid #dadce0; border-radius: 4px;
+  cursor: pointer; font-size: 13px; color: #5f6368; padding: 2px 6px;
+  margin-left: 6px; vertical-align: middle; transition: all 0.15s;
+}
+.btn-edit-signature:hover { border-color: #1a73e8; color: #1a73e8; background: #e8f0fe; }
+.signature-edit { display: flex; gap: 6px; align-items: center; }
+.signature-input { flex: 1; padding: 6px 10px; border: 1px solid #dadce0; border-radius: 6px; font-size: 13px; outline: none; min-width: 0; }
+.signature-input:focus { border-color: #1a73e8; }
+.btn-save-sig { padding: 4px 12px; background: #1a73e8; color: #fff; border: none; border-radius: 6px; font-size: 12px; cursor: pointer; }
+.btn-cancel-sig { padding: 4px 12px; background: #fff; color: #5f6368; border: 1px solid #dadce0; border-radius: 6px; font-size: 12px; cursor: pointer; }
 
 .user-name {
   font-size: 20px;

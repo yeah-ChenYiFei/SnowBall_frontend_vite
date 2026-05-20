@@ -45,7 +45,11 @@ const handleCancel = () => {
 const handleSubmitReply = () => {
   if (!replyText.value.trim() && !replyImageUrl.value) return
   if (!userStore.isLogin()) return alert('请先登录')
-  emit('submit-reply', props.comment.id, replyText.value.trim() || '[图片]', replyImageUrl.value || undefined)
+  emit('submit-reply', props.comment.id, replyText.value.trim() || undefined, replyImageUrl.value || undefined)
+}
+
+function removeReplyImage() {
+  replyImageUrl.value = ''
 }
 
 const handleLike = async () => {
@@ -99,6 +103,10 @@ watch(isReplying, (newVal) => {
       </div>
 
       <div v-if="isReplying" class="inline-reply-box">
+        <div v-if="replyImageUrl" class="reply-preview">
+          <img :src="replyImageUrl" class="preview-thumb" @click="emit('open-lightbox', replyImageUrl)" />
+          <button class="preview-remove" @click="removeReplyImage()">&times;</button>
+        </div>
         <textarea
           ref="replyRef"
           v-model="replyText"
@@ -150,6 +158,9 @@ watch(isReplying, (newVal) => {
   cursor: pointer; object-fit: cover; display: block; margin-bottom: 8px;
 }
 .inline-spacer { flex: 1; }
+.reply-preview { display: flex; align-items: flex-start; gap: 6px; margin-bottom: 8px; }
+.preview-thumb { max-width: 120px; max-height: 80px; border-radius: 6px; object-fit: cover; cursor: pointer; }
+.preview-remove { background: rgba(0,0,0,0.4); color: #fff; border: none; border-radius: 50%; width: 18px; height: 18px; font-size: 12px; cursor: pointer; flex-shrink: 0; line-height: 1; }
 .children-thread { margin-left: 12px; padding-left: 8px; border-left: 2px solid #e8eaed; overflow: hidden; }
 
 .inline-reply-box {

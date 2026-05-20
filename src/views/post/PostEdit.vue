@@ -55,7 +55,8 @@ const handleSubmit = async () => {
       title: formData.value.title,
       body: formData.value.body,
       tags: formData.value.tags,
-      changeSummary: changeSummary.value || '无备注更新'
+      images: formData.value.images,
+              changeSummary: changeSummary.value || '无备注更新'
     })
 
     message.value = '🎉 保存成功！已生成新的历史版本。'

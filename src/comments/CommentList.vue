@@ -39,12 +39,12 @@ const loadComments = async () => {
 
 // ✅ 提交一级主评论
 const submitMainComment = async () => {
-  if (!newComment.value.trim()) return
+  if (!newComment.value.trim() && !commentImageUrl.value) return
   if (!userStore.isLogin()) return alert('请先登录')
   try {
     const imgUrl = commentImageUrl.value
     await http.post(`/posts/${props.postId}/comments`, {
-      body: newComment.value.trim(),
+      body: newComment.value.trim() || undefined,
       parentId: null,
       imageUrl: imgUrl || undefined
     })
@@ -52,6 +52,10 @@ const submitMainComment = async () => {
     commentImageUrl.value = ''
     await loadComments()
   } catch (error: any) { alert(error.message || '评论失败') }
+}
+
+function removeCommentImage() {
+  commentImageUrl.value = ''
 }
 
 // ✅ 接收子组件的打开/关闭事件
@@ -82,6 +86,10 @@ defineExpose({ loadComments })
 
     <!-- 顶部输入区：现在专门用于发表一级主评论 -->
     <div class="comment-form">
+      <div v-if="commentImageUrl" class="comment-preview">
+        <img :src="commentImageUrl" class="preview-thumb" @click="lightboxUrl = commentImageUrl; showLightbox = true" />
+        <button class="preview-remove" @click="removeCommentImage()">&times;</button>
+      </div>
       <textarea
         v-model="newComment"
         placeholder="写下你的想法..."
@@ -152,6 +160,9 @@ defineExpose({ loadComments })
   box-sizing: border-box;
   margin-bottom: 12px;
 }
+.comment-preview { display: flex; align-items: flex-start; gap: 6px; margin-bottom: 8px; }
+.preview-thumb { max-width: 120px; max-height: 80px; border-radius: 6px; object-fit: cover; cursor: pointer; }
+.preview-remove { background: rgba(0,0,0,0.4); color: #fff; border: none; border-radius: 50%; width: 18px; height: 18px; font-size: 12px; cursor: pointer; flex-shrink: 0; line-height: 1; }
 .comment-form-actions {
   display: flex; align-items: center; gap: 10px; justify-content: flex-end;
 }

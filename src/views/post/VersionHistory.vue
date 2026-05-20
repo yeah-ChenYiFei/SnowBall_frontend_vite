@@ -11,8 +11,14 @@ interface Version {
   id: number
   versionNumber: number
   bodySnapshot: string
+  imagesSnapshot?: string
   changeSummary: string
   createdAt: string
+}
+
+function parseImages(imagesSnapshot?: string): string[] {
+  if (!imagesSnapshot || imagesSnapshot === '[]') return []
+  try { return JSON.parse(imagesSnapshot) } catch { return [] }
 }
 
 const route = useRoute()
@@ -129,6 +135,10 @@ onMounted(() => {
             <span class="ver-time">{{ new Date(ver.createdAt).toLocaleString() }}</span>
           </div>
           <p class="ver-summary">{{ ver.changeSummary || '无摘要' }}</p>
+          <div v-if="parseImages(ver.imagesSnapshot).length > 0" class="ver-images">
+            <img v-for="(img, i) in parseImages(ver.imagesSnapshot).slice(0, 3)" :key="i" :src="img" class="ver-thumb" />
+            <span v-if="parseImages(ver.imagesSnapshot).length > 3" class="ver-more">+{{ parseImages(ver.imagesSnapshot).length - 3 }}</span>
+          </div>
         </div>
       </div>
 
@@ -154,6 +164,9 @@ onMounted(() => {
           <!-- 历史版本原始内容预览 -->
           <div class="snapshot-box">
             <div class="snapshot-title">历史快照内容 (V{{ selectedVersion.versionNumber }})</div>
+            <div v-if="parseImages(selectedVersion.imagesSnapshot).length > 0" class="snapshot-images">
+              <img v-for="(img, i) in parseImages(selectedVersion.imagesSnapshot)" :key="i" :src="img" class="snapshot-img" />
+            </div>
             <pre class="snapshot-text">{{ selectedVersion.bodySnapshot }}</pre>
           </div>
 
@@ -223,4 +236,9 @@ onMounted(() => {
   font-size: 14px; line-height: 1.6; border: 1px solid #e8eaed;
   border-radius: 6px; overflow: hidden;
 }
+.ver-images { display: flex; gap: 4px; margin-top: 8px; align-items: center; }
+.ver-thumb { width: 40px; height: 40px; border-radius: 4px; object-fit: cover; }
+.ver-more { font-size: 11px; color: #999; }
+.snapshot-images { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+.snapshot-img { width: 80px; height: 80px; border-radius: 6px; object-fit: cover; }
 </style>

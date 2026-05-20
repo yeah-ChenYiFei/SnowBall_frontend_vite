@@ -26,7 +26,7 @@ function onAuthorEnter(e: MouseEvent, userId: number) {
   if (hoverTimer) clearTimeout(hoverTimer)
   hoverUserId.value = userId; hoverEl.value = e.currentTarget as HTMLElement; showHoverMenu.value = true
 }
-function onAuthorLeave() { hoverTimer = setTimeout(() => { showHoverMenu.value = false }, 300) }
+function onAuthorLeave() { hoverTimer = setTimeout(() => { showHoverMenu.value = false }, 500) }
 
 const typeMap: Record<string, string> = {
   OC: '原创角色', SETTING: '世界观', FRAGMENT: '小说片段', BOOK_INFO: '书籍信息',
