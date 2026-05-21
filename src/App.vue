@@ -226,21 +226,23 @@ function handleLogout() {
 </template>
 
 <style scoped>
-/* 雪球设计规范：白色与微蓝极简风格 */
+/* 雪球设计规范：玻璃拟态 + 文学气质 */
 .snowball-header {
-  background: #ffffff;
-  border-bottom: 1px solid #e8f0fe;
-  box-shadow: 0 2px 8px rgba(66, 133, 244, 0.08);
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(12px) saturate(120%);
+  -webkit-backdrop-filter: blur(12px) saturate(120%);
+  border-bottom: 1px solid rgba(232, 240, 254, 0.6);
+  box-shadow: var(--shadow-header);
   position: sticky;
   top: 0;
   z-index: 1000;
 }
 
 .header-content {
-  max-width: 1200px;
+  max-width: var(--content-max-width);
   margin: 0 auto;
   padding: 0 24px;
-  height: 64px;
+  height: var(--header-height);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -258,15 +260,23 @@ function handleLogout() {
 }
 
 .brand-name {
+  font-family: var(--font-serif);
   font-size: 20px;
-  font-weight: 600;
-  color: #1a73e8;
+  font-weight: 400;
+  letter-spacing: 0.08em;
+  color: var(--color-primary);
   text-decoration: none;
 }
 
+.brand-name:hover {
+  color: var(--color-primary-hover);
+}
+
 .brand-slogan {
+  font-family: var(--font-serif);
   font-size: 12px;
-  color: #5f6368;
+  font-weight: 200;
+  color: var(--color-text-secondary);
   margin-left: 8px;
 }
 
@@ -277,28 +287,28 @@ function handleLogout() {
 }
 
 .nav-link {
-  color: #5f6368;
+  color: var(--color-text-secondary);
   text-decoration: none;
   font-size: 15px;
   padding: 8px 12px;
-  border-radius: 6px;
-  transition: all 0.2s ease;
+  border-radius: var(--radius-sm);
+  transition: all var(--transition-normal);
 }
 
 .nav-link:hover {
-  color: #1a73e8;
-  background: #e8f0fe;
+  color: var(--color-primary);
+  background: var(--color-primary-light);
 }
 
 .nav-link.router-link-active {
-  color: #1a73e8;
-  background: #e8f0fe;
+  color: var(--color-primary);
+  background: var(--color-primary-light);
   font-weight: 500;
 }
 
 .nav-link-dropdown.is-active {
-  color: #1a73e8;
-  background: #e8f0fe;
+  color: var(--color-primary);
+  background: var(--color-primary-light);
 }
 
 /* 用户操作按钮 */
@@ -309,54 +319,55 @@ function handleLogout() {
 
 .btn-login {
   padding: 8px 20px;
-  border: 1px solid #1a73e8;
-  color: #1a73e8;
-  border-radius: 6px;
+  border: 1px solid var(--color-primary);
+  color: var(--color-primary);
+  border-radius: var(--radius-sm);
   text-decoration: none;
   font-size: 14px;
-  transition: all 0.2s ease;
+  transition: all var(--transition-normal);
 }
 
 .btn-login:hover {
-  background: #e8f0fe;
+  background: var(--color-primary-light);
 }
 
 .btn-register {
   padding: 8px 20px;
-  background: #1a73e8;
+  background: var(--color-primary);
   color: white;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   text-decoration: none;
   font-size: 14px;
-  transition: all 0.2s ease;
+  transition: all var(--transition-normal);
 }
 
 .btn-register:hover {
-  background: #1557b0;
+  background: var(--color-primary-hover);
 }
 
 .btn-logout {
   padding: 8px 16px;
-  border: 1px solid #dadce0;
-  background: white;
-  color: #5f6368;
-  border-radius: 6px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  border-radius: var(--radius-sm);
   cursor: pointer;
   font-size: 14px;
+  transition: all var(--transition-normal);
 }
 
 .btn-logout:hover {
-  background: #f8f9fa;
-  border-color: #dadce0;
+  background: var(--color-bg);
+  border-color: var(--color-border);
 }
 
 /* 页面内容区 */
 .page-content {
-  max-width: 1200px;
+  max-width: var(--content-max-width);
   margin: 0 auto;
   padding: 32px 24px;
-  min-height: calc(100vh - 64px);
-  background: #f8f9fa;
+  min-height: calc(100vh - var(--header-height));
+  background: linear-gradient(180deg, #e8f0fe 0%, var(--color-bg) 12%);
 }
 
 /* 下拉菜单 */
@@ -386,10 +397,12 @@ function handleLogout() {
   top: calc(100% + 8px);
   left: 0;
   min-width: 180px;
-  background: #fff;
-  border-radius: 10px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.10), 0 2px 6px rgba(0, 0, 0, 0.06);
-  border: 1px solid #e8f0fe;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(16px) saturate(120%);
+  -webkit-backdrop-filter: blur(16px) saturate(120%);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card-elevated);
+  border: 1px solid var(--color-primary-border);
   padding: 6px 0;
   z-index: 1001;
   transform-origin: top center;
@@ -400,22 +413,22 @@ function handleLogout() {
   flex-direction: column;
   padding: 10px 18px;
   text-decoration: none;
-  transition: background 0.15s ease;
+  transition: background var(--transition-fast);
 }
 
 .dropdown-item:hover {
-  background: #e8f0fe;
+  background: var(--color-primary-light);
 }
 
 .item-label {
   font-size: 14px;
   font-weight: 500;
-  color: #202124;
+  color: var(--color-text);
 }
 
 .item-desc {
   font-size: 12px;
-  color: #5f6368;
+  color: var(--color-text-secondary);
   margin-top: 2px;
 }
 
@@ -424,7 +437,7 @@ function handleLogout() {
   right: 14px;
   top: 50%;
   transform: translateY(-50%);
-  background: #ea4335;
+  background: var(--color-notification);
   color: #fff;
   border-radius: 10px;
   padding: 1px 6px;
@@ -440,18 +453,17 @@ function handleLogout() {
 .soon-tag {
   font-size: 10px;
   padding: 1px 6px;
-  background: #fef7e0;
-  color: #e37400;
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
   border-radius: 4px;
   margin-left: 6px;
   vertical-align: 2px;
 }
 
-/* Active state for wild routes — highlight the 旷野 dropdown */
 .nav-link-dropdown.is-active,
 .nav-link-dropdown:has(.router-link-active) {
-  color: #1a73e8;
-  background: #e8f0fe;
+  color: var(--color-primary);
+  background: var(--color-primary-light);
 }
 
 /* Vue transition: dropdown */
@@ -474,22 +486,22 @@ function handleLogout() {
 .btn-notify {
   position: relative;
   padding: 8px 12px;
-  background: white;
-  border: 1px solid #dadce0;
-  border-radius: 6px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
   cursor: pointer;
   font-size: 16px;
   text-decoration: none;
   display: flex;
   align-items: center;
-  transition: background 0.2s;
+  transition: background var(--transition-fast);
 }
-.btn-notify:hover { background: #f8f9fa; }
+.btn-notify:hover { background: var(--color-bg); }
 .badge {
   position: absolute;
   top: -4px;
   right: -6px;
-  background: #ea4335;
+  background: var(--color-notification);
   color: #fff;
   font-size: 10px;
   font-weight: 700;
