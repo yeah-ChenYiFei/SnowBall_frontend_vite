@@ -105,6 +105,7 @@ const handleLogin = async () => {
       </form>
 
       <div class="card-footer">
+        <router-link to="/forgot-password" class="forgot-link">忘记密码？</router-link>
         <router-link to="/register">还没有账号？<span>立即注册</span></router-link>
       </div>
     </GlassCard>
@@ -268,5 +269,10 @@ const handleLogin = async () => {
 
 .card-footer a:hover {
   color: var(--color-primary);
+}
+
+.forgot-link {
+  display: block;
+  margin-bottom: 8px;
 }
 </style>

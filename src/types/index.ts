@@ -12,6 +12,7 @@ export interface Result<T = any> {
 export interface UserInfo {
   id: number
   username: string
+  email?: string
   role: string
   avatarUrl?: string
   createdAt?: string

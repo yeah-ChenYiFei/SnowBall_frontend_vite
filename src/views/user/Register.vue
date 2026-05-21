@@ -8,6 +8,7 @@ import AppButton from '@/components/AppButton.vue'
 import AppInput from '@/components/AppInput.vue'
 
 const router = useRouter()
+const email = ref('')
 const username = ref('')
 const password = ref('')
 const confirmPassword = ref('')
@@ -38,16 +39,20 @@ onMounted(() => {
 const handleRegister = async () => {
   errMsg.value = ''
 
-  if (!username.value || !password.value) {
-    errMsg.value = '用户名和密码不能为空'
+  if (!username.value || !email.value || !password.value) {
+    errMsg.value = '用户名、邮箱和密码不能为空'
     return
   }
   if (username.value.length < 3) {
     errMsg.value = '用户名长度至少为3位'
     return
   }
-  if (password.value.length < 6) {
-    errMsg.value = '密码长度至少为6位'
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value)) {
+    errMsg.value = '邮箱格式不正确'
+    return
+  }
+  if (password.value.length < 8) {
+    errMsg.value = '密码长度至少为8位'
     return
   }
   if (password.value !== confirmPassword.value) {
@@ -57,12 +62,13 @@ const handleRegister = async () => {
 
   loading.value = true
   try {
-    await http.post('/auth/register', {
+    const res = await http.post('/auth/register', {
       username: username.value,
+      email: email.value,
       password: password.value
     })
-    alert('注册成功！请登录')
-    router.push('/login')
+    const userId = res.data.userId
+    router.push({ path: '/verify-email', query: { userId: String(userId) } })
   } catch (error: any) {
     errMsg.value = error.message || '注册失败，请稍后再试'
   } finally {
@@ -75,7 +81,6 @@ const handleRegister = async () => {
   <div class="register-fullscreen">
     <SnowBg />
 
-    <!-- Top-left artistic text -->
     <div class="artistic-text">
       <div class="art-line" :class="{ visible: showLine }" />
       <Transition name="text-rotate" mode="out-in">
@@ -86,7 +91,6 @@ const handleRegister = async () => {
       </Transition>
     </div>
 
-    <!-- Glass card -->
     <GlassCard class="register-card">
       <div class="card-brand">
         <h1 class="brand-title">加入雪球</h1>
@@ -104,11 +108,19 @@ const handleRegister = async () => {
           required
         />
         <AppInput
+          id="reg-email"
+          v-model="email"
+          type="email"
+          autocomplete="email"
+          placeholder="邮箱地址"
+          required
+        />
+        <AppInput
           id="reg-password"
           v-model="password"
           type="password"
           autocomplete="new-password"
-          placeholder="密码（至少6个字符）"
+          placeholder="密码（至少8位）"
           required
         />
         <AppInput
@@ -126,7 +138,7 @@ const handleRegister = async () => {
           class="submit-btn"
           @click="handleRegister"
         >
-          <template v-if="!loading">注 册</template>
+          <template v-if="!loading">注 册 并 验 证 邮 箱</template>
           <template v-else>注册中...</template>
         </AppButton>
       </form>

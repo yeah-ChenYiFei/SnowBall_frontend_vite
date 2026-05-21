@@ -20,6 +20,9 @@ import VersionHistory from '@/views/post/VersionHistory.vue'
 import ChainDetail from '@/views/post/ChainDetail.vue'
 import Login from '@/views/user/Login.vue'
 import Register from '@/views/user/Register.vue'
+import VerifyEmail from '@/views/user/VerifyEmail.vue'
+import ForgotPassword from '@/views/user/ForgotPassword.vue'
+import Settings from '@/views/user/Settings.vue'
 import Profile from '@/views/user/Profile.vue'
 import Groups from '@/views/user/Groups.vue'
 import GroupDetail from '@/views/group/GroupDetail.vue'
@@ -56,6 +59,9 @@ const router = createRouter({
     { path: '/chain/:id', component: ChainDetail },
     { path: '/login', component: Login },
     { path: '/register', component: Register },
+    { path: '/verify-email', component: VerifyEmail },
+    { path: '/forgot-password', component: ForgotPassword },
+    { path: '/settings', component: Settings, meta: { requiresAuth: true } },
     { path: '/profile/:userId', component: Profile },
     { path: '/mine', redirect: (to: any) => `/profile/${to.query.userId || 'self'}` },
     { path: '/books', component: BookManage, meta: { requiresAuth: true } },
@@ -89,6 +95,8 @@ const PUBLIC_PATHS = new Set([
   '/',
   '/login',
   '/register',
+  '/verify-email',
+  '/forgot-password',
   '/explore',
   '/about',
 ])

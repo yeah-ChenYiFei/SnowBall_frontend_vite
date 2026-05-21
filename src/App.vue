@@ -212,6 +212,7 @@ function handleLogout() {
             🔔
             <span v-if="unreadCount > 0" class="badge">{{ unreadCount > 99 ? '99+' : unreadCount }}</span>
           </router-link>
+          <router-link to="/settings" class="btn-settings">账户设置</router-link>
           <button @click="handleLogout" class="btn-logout">退出登录</button>
         </template>
       </div>
@@ -343,6 +344,23 @@ function handleLogout() {
 
 .btn-register:hover {
   background: var(--color-primary-hover);
+}
+
+.btn-settings {
+  padding: 8px 16px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  border-radius: var(--radius-sm);
+  text-decoration: none;
+  font-size: 14px;
+  transition: all var(--transition-normal);
+}
+
+.btn-settings:hover {
+  background: var(--color-bg);
+  border-color: var(--color-border);
+  color: var(--color-primary);
 }
 
 .btn-logout {
