@@ -59,6 +59,28 @@ const fontSize = ref('16')
 const lineHeight = ref('1.8')
 const fontFamily = ref('default')
 
+// AI continuation
+const aiOutput = ref('')
+const aiLoading = ref(false)
+
+async function handleAiContinue() {
+  if (!editId.value) {
+    message.value = '请先保存章节后再使用AI续写'
+    return
+  }
+  aiLoading.value = true
+  aiOutput.value = ''
+  try {
+    const res = await http.post('/ai/continue', { articleId: editId.value })
+    const data = res.data as { continuation: string; model: string; tokensUsed: number }
+    aiOutput.value = data.continuation
+  } catch (e: any) {
+    aiOutput.value = 'AI续写失败: ' + (e.message || '未知错误')
+  } finally {
+    aiLoading.value = false
+  }
+}
+
 const wordCount = computed(() => content.value.length)
 
 // Publish + bind world
@@ -666,14 +688,31 @@ const textareaStyle = computed(() => ({
             </div>
           </div>
 
-          <!-- Writing Area -->
-          <div class="writing-area">
-            <textarea
-              v-model="content"
-              class="writing-textarea"
-              :style="textareaStyle"
-              placeholder="在这里挥洒您的文采..."
-            ></textarea>
+          <!-- Writing Area with AI Panel -->
+          <div class="writing-area-row">
+            <div class="writing-area">
+              <textarea
+                v-model="content"
+                class="writing-textarea"
+                :style="textareaStyle"
+                placeholder="在这里挥洒您的文采..."
+              ></textarea>
+            </div>
+            <div class="ai-panel">
+              <div class="ai-panel-header">🤖 AI 续写</div>
+              <div class="ai-output" :class="{ loading: aiLoading }">
+                <span v-if="aiLoading" class="ai-loading-text">AI 正在续写中...</span>
+                <span v-else-if="!aiOutput" class="ai-placeholder">点击下方按钮，AI 将根据绑定的世界设定和已有小说内容进行续写</span>
+                <span v-else>{{ aiOutput }}</span>
+              </div>
+              <button
+                class="ai-continue-btn"
+                :disabled="aiLoading"
+                @click="handleAiContinue"
+              >
+                {{ aiLoading ? '续写中...' : 'AI 续写' }}
+              </button>
+            </div>
           </div>
 
           <div class="editor-footer">
@@ -763,7 +802,7 @@ const textareaStyle = computed(() => ({
 
 <style scoped>
 .writing-editor {
-  max-width: 860px;
+  max-width: 1100px;
   margin: 0 auto;
   padding: 20px;
 }
@@ -1234,6 +1273,119 @@ const textareaStyle = computed(() => ({
 .bound-world-card .btn-bind { padding: 8px 0; background: #1a73e8; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; }
 .bound-world-card .btn-bind:disabled { opacity: 0.5; cursor: not-allowed; }
 .bound-world-card .bind-select { padding: 8px 12px; border: 1px solid #dadce0; border-radius: 6px; font-size: 13px; outline: none; }
+
+/* ── AI Panel ── */
+.writing-area-row {
+  display: flex;
+  gap: 0;
+  margin-bottom: 0;
+}
+
+.writing-area-row .writing-area {
+  flex: 1;
+  min-width: 0;
+}
+
+.writing-area-row .writing-textarea {
+  border-radius: 0 0 0 8px;
+  resize: vertical;
+  min-height: 420px;
+}
+
+.ai-panel {
+  width: 320px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #e8eaed;
+  border-left: 1px solid #e8eaed;
+  border-radius: 0 0 8px 0;
+  background: #fafbfc;
+}
+
+.ai-panel-header {
+  padding: 10px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #1a73e8;
+  border-bottom: 1px solid #e8eaed;
+  background: #fff;
+}
+
+.ai-output {
+  flex: 1;
+  padding: 14px 16px;
+  font-size: 14px;
+  line-height: 1.8;
+  color: #202124;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  min-height: 320px;
+  max-height: 500px;
+}
+
+.ai-output.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ai-loading-text {
+  color: #1a73e8;
+  font-size: 14px;
+  animation: ai-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes ai-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.ai-placeholder {
+  color: #bdc1c6;
+  font-size: 13px;
+}
+
+.ai-continue-btn {
+  margin: 0 12px 12px;
+  padding: 10px 0;
+  background: linear-gradient(135deg, #1a73e8 0%, #4285f4 100%);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.25s;
+  box-shadow: 0 2px 8px rgba(26, 115, 232, 0.2);
+}
+
+.ai-continue-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(26, 115, 232, 0.35);
+}
+
+.ai-continue-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+@media (max-width: 900px) {
+  .writing-area-row {
+    flex-direction: column;
+  }
+  .ai-panel {
+    width: 100%;
+    border-left: 1px solid #e8eaed;
+    border-top: none;
+    border-radius: 0 0 8px 8px;
+  }
+  .writing-area-row .writing-textarea {
+    border-radius: 0 0 0 0;
+  }
+}
 
 @media (max-width: 700px) { .novel-two-col { grid-template-columns: 1fr; } }
 </style>
