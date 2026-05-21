@@ -23,6 +23,7 @@ const textGroups = [
   { cn: '灵感如雪花般消融', en: 'Inspiration melts like snowflakes' },
   { cn: '在梦中堆起儿时的雪堡', en: 'Building childhood snow forts in dreams' },
   { cn: '茫茫雪原中寻觅友人', en: 'Searching for friends across snowy plains' },
+  { cn: '故事如雪球般滚动', en: 'Stories roll on like a snowball' },
 ]
 
 onMounted(() => {

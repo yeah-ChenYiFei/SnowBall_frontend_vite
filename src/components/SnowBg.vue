@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { ref, onMounted, onUnmounted } from 'vue'
+
 const blobs = [
   { size: 180, left: 8,  delay: 0,   dur: 22, color: 'rgba(200,220,245,0.65)' },
   { size: 120, left: 22, delay: -5,  dur: 28, color: 'rgba(235,240,250,0.55)' },
@@ -15,11 +17,82 @@ const blobs = [
   { size: 150, left: 42, delay: -7,  dur: 25, color: 'rgba(195,218,244,0.5)' },
   { size: 190, left: 80, delay: -15, dur: 27, color: 'rgba(230,238,251,0.5)' },
 ]
+
+// ── Mouse interaction physics ──
+const mouseX = ref(-9999)
+const mouseY = ref(-9999)
+const wrapperRefs = ref<(HTMLElement | null)[]>([])
+const innerRefs = ref<(HTMLElement | null)[]>([])
+const offsets: { x: number; y: number }[] = blobs.map(() => ({ x: 0, y: 0 }))
+
+function onMouseMove(e: MouseEvent) {
+  mouseX.value = e.clientX
+  mouseY.value = e.clientY
+}
+
+let rafId = 0
+
+function animate() {
+  const mx = mouseX.value
+  const my = mouseY.value
+
+  for (let i = 0; i < blobs.length; i++) {
+    const wrapper = wrapperRefs.value[i]
+    const inner = innerRefs.value[i]
+    if (!wrapper || !inner) continue
+
+    const rect = wrapper.getBoundingClientRect()
+    const cx = rect.left + rect.width / 2
+    const cy = rect.top + rect.height / 2
+
+    const dx = cx - mx
+    const dy = cy - my
+    const dist = Math.sqrt(dx * dx + dy * dy)
+
+    const radius = 140
+    let targetX = 0
+    let targetY = 0
+
+    if (dist < radius && dist > 0.1) {
+      // Repulsion strength: stronger when closer, with a gentle falloff curve
+      const t = dist / radius
+      const strength = (1 - t) * (1 - t) * 90 // quadratic falloff, max 90px
+      targetX = (dx / dist) * strength
+      targetY = (dy / dist) * strength
+    }
+
+    // Slow lerp toward target for leisurely drifting feel
+    offsets[i].x += (targetX - offsets[i].x) * 0.035
+    offsets[i].y += (targetY - offsets[i].y) * 0.035
+
+    // Direct DOM write for 60fps — bypass Vue reactivity
+    inner.style.transform = `translate(${offsets[i].x}px, ${offsets[i].y}px)`
+  }
+
+  rafId = requestAnimationFrame(animate)
+}
+
+onMounted(() => {
+  document.addEventListener('mousemove', onMouseMove, { passive: true })
+  rafId = requestAnimationFrame(animate)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('mousemove', onMouseMove)
+  cancelAnimationFrame(rafId)
+})
+
+function setWrapperRef(el: Element | null, i: number) {
+  wrapperRefs.value[i] = el as HTMLElement | null
+}
+
+function setInnerRef(el: Element | null, i: number) {
+  innerRefs.value[i] = el as HTMLElement | null
+}
 </script>
 
 <template>
   <div class="snow-bg">
-    <!-- SVG filters for crayon texture -->
     <svg class="texture-svg">
       <defs>
         <filter id="crayon-filter" x="-20%" y="-20%" width="140%" height="140%">
@@ -39,16 +112,24 @@ const blobs = [
       <div
         v-for="(b, i) in blobs"
         :key="i"
-        class="blob"
+        :ref="(el: any) => setWrapperRef(el as Element, i)"
+        class="blob-wrapper"
         :style="{
-          width: b.size + 'px',
-          height: b.size + 'px',
           left: b.left + '%',
           animationDelay: b.delay + 's',
           animationDuration: b.dur + 's',
-          background: `radial-gradient(circle at 35% 35%, ${b.color} 0%, ${b.color} 30%, ${b.color.replace(/[\d.]+\)$/, '0.25)')} 55%, transparent 75%)`,
         }"
-      />
+      >
+        <div
+          :ref="(el: any) => setInnerRef(el as Element, i)"
+          class="blob"
+          :style="{
+            width: b.size + 'px',
+            height: b.size + 'px',
+            background: `radial-gradient(circle at 35% 35%, ${b.color} 0%, ${b.color} 30%, ${b.color.replace(/[\d.]+\)$/, '0.25)')} 55%, transparent 75%)`,
+          }"
+        />
+      </div>
     </div>
   </div>
 </template>
@@ -74,28 +155,33 @@ const blobs = [
   -webkit-mask-image: linear-gradient(to bottom, black 0%, black 80%, transparent 100%);
 }
 
-.blob {
+.blob-wrapper {
   position: absolute;
   top: -300px;
+  animation: blob-fall linear infinite;
+  /* wrapper handles CSS falling + swaying; inner handles mouse offset */
+}
+
+.blob {
   border-radius: 42% 56% 48% 52% / 44% 38% 54% 46%;
   filter: url(#crayon-filter) blur(2px);
   opacity: 0.8;
-  animation: blob-fall linear infinite;
+  will-change: transform;
 }
 
-.blob:nth-child(odd) {
+.blob-wrapper:nth-child(odd) .blob {
   border-radius: 48% 40% 55% 45% / 50% 46% 42% 52%;
 }
 
-.blob:nth-child(3n) {
+.blob-wrapper:nth-child(3n) .blob {
   border-radius: 52% 48% 40% 56% / 40% 54% 48% 44%;
 }
 
-.blob:nth-child(3n+1) {
+.blob-wrapper:nth-child(3n+1) .blob {
   border-radius: 45% 52% 44% 50% / 52% 40% 50% 43%;
 }
 
-.blob:nth-child(4n) {
+.blob-wrapper:nth-child(4n) .blob {
   border-radius: 50% 44% 52% 46% / 42% 50% 43% 54%;
 }
 
