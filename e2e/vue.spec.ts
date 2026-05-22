@@ -1,8 +1,17 @@
 import { test, expect } from '@playwright/test'
 
-// See here how to get started:
-// https://playwright.dev/docs/intro
-test('visits the app root url', async ({ page }) => {
+test('home page loads', async ({ page }) => {
   await page.goto('/')
-  await expect(page.locator('h1')).toHaveText('You did it!')
+  await expect(page.locator('.snowball-header')).toBeVisible()
+})
+
+test('login page loads', async ({ page }) => {
+  await page.goto('/login')
+  await expect(page.locator('input[type="text"]')).toBeVisible()
+  await expect(page.locator('input[type="password"]')).toBeVisible()
+})
+
+test('register page has email field', async ({ page }) => {
+  await page.goto('/register')
+  await expect(page.locator('input[type="email"]')).toBeVisible()
 })

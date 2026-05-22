@@ -40,6 +40,11 @@ import PublicWorlds from '@/views/wild/PublicWorlds.vue'
 import PublicWorldDetail from '@/views/wild/PublicWorldDetail.vue'
 import PublicLibrary from '@/views/wild/PublicLibrary.vue'
 import ArticleDetail from '@/views/wild/ArticleDetail.vue'
+import AdminDashboard from '@/views/admin/Dashboard.vue'
+import AdminUserList from '@/views/admin/UserList.vue'
+import AdminArticleList from '@/views/admin/ArticleList.vue'
+import AdminWorldList from '@/views/admin/WorldList.vue'
+import Favorites from '@/views/user/Favorites.vue'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -66,6 +71,7 @@ const router = createRouter({
     { path: '/mine', redirect: (to: any) => `/profile/${to.query.userId || 'self'}` },
     { path: '/books', component: BookManage, meta: { requiresAuth: true } },
     { path: '/friends', component: Friends, meta: { requiresAuth: true } },
+    { path: '/favorites', component: Favorites, meta: { requiresAuth: true } },
     { path: '/groups', component: Groups, meta: { requiresAuth: true } },
     { path: '/groups/:groupId', component: GroupDetail, meta: { requiresAuth: true } },
     { path: '/notifications', component: Notifications, meta: { requiresAuth: true } },
@@ -85,8 +91,11 @@ const router = createRouter({
     { path: '/wild/library', component: PublicLibrary },
     { path: '/wild/library/:id', component: ArticleDetail },
 
-    // ✅ 示例：未来如果你加了后台管理页面，就这样配
-    // { path: '/admin', component: () => import('@/views/admin/Dashboard.vue'), meta: { requiresAuth: true, requiredRoles: [ROLES.SYS_ADMIN] } }
+    // 管理后台
+    { path: '/admin', component: AdminDashboard, meta: { requiresAuth: true, requiredRoles: [ROLES.SYS_ADMIN] } },
+    { path: '/admin/users', component: AdminUserList, meta: { requiresAuth: true, requiredRoles: [ROLES.SYS_ADMIN] } },
+    { path: '/admin/articles', component: AdminArticleList, meta: { requiresAuth: true, requiredRoles: [ROLES.SYS_ADMIN] } },
+    { path: '/admin/worlds', component: AdminWorldList, meta: { requiresAuth: true, requiredRoles: [ROLES.SYS_ADMIN] } },
   ]
 })
 

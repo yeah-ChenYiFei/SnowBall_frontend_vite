@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(& \"E:\\\\python_project\\\\uCloud_GetInformation\\\\.venv\\\\Scripts\\\\pip.exe\" list 2>$null)",
+      "PowerShell(& \"E:\\\\python_project\\\\uCloud_GetInformation\\\\.venv\\\\Scripts\\\\python.exe\" -c \"import lxml; print\\(lxml.__version__\\); print\\(dir\\(lxml\\)\\)\")",
+      "PowerShell(& \"E:\\\\python_project\\\\uCloud_GetInformation\\\\.venv\\\\Scripts\\\\python.exe\" -c \"import lxml.etree; print\\('etree ok'\\)\")",
+      "PowerShell(& \"E:\\\\python_project\\\\uCloud_GetInformation\\\\.venv\\\\Scripts\\\\python.exe\" --version)",
+      "PowerShell(Get-Command *)",
+      "PowerShell(Get-ChildItem \"C:\\\\Program Files\\\\Google\\\\Chrome\\\\Application\\\\chrome.exe\" -ErrorAction SilentlyContinue | ForEach-Object { $_.VersionInfo.ProductVersion }; Get-ChildItem \"C:\\\\Program Files \\(x86\\)\\\\Google\\\\Chrome\\\\Application\\\\chrome.exe\" -ErrorAction SilentlyContinue | ForEach-Object { $_.VersionInfo.ProductVersion })",
+      "PowerShell(chromedriver *)",
+      "PowerShell(Get-ChildItem *)",
+      "PowerShell(Get-ChildItem \"C:\\\\Program Files \\(x86\\)\\\\Microsoft\\\\Edge\\\\Application\\\\msedge.exe\" -ErrorAction SilentlyContinue | ForEach-Object { $_.VersionInfo.ProductVersion }; Get-ChildItem \"C:\\\\Program Files\\\\Microsoft\\\\Edge\\\\Application\\\\msedge.exe\" -ErrorAction SilentlyContinue | ForEach-Object { $_.VersionInfo.ProductVersion })",
+      "PowerShell(Set-Location \"E:\\\\python_project\\\\uCloud_GetInformation\"; Select-String -Path \"data\\\\yunyou_page.html\" -Pattern \"待办|作业|活动\" -AllMatches | ForEach-Object { $_.Line.Substring\\(0, [Math]::Min\\(200, $_.Line.Length\\)\\) })",
+      "PowerShell(Set-Location \"E:\\\\python_project\\\\uCloud_GetInformation\"; Select-String -Path \"data\\\\homework_detail.html\" -Pattern \"课程|课堂|课\" -AllMatches | ForEach-Object { $_.Line.Substring\\(0, [Math]::Min\\(200, $_.Line.Length\\)\\) })",
+      "PowerShell(Select-String -Path \"E:\\\\python_project\\\\uCloud_GetInformation\\\\data\\\\homework_detail.html\" -Pattern \"course|课程|class\" -AllMatches | ForEach-Object { $_.Line.Substring\\(0, [Math]::Min\\(120, $_.Line.Length\\)\\) })",
+      "PowerShell(Set-Location \"E:\\\\python_project\\\\uCloud_GetInformation\"; if \\(Test-Path result.txt\\) { Get-Content result.txt | Select-Object -First 5; Write-Host \"---\"; Write-Host \"Total lines: $\\(\\(Get-Content result.txt | Measure-Object -Line\\).Lines\\)\" } else { Write-Host \"No result.txt yet\" })"
+    ]
+  }
+}

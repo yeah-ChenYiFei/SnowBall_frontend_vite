@@ -190,10 +190,19 @@ function handleLogout() {
                   <span class="item-label">我的藏书</span>
                   <span class="item-desc">管理实体书收藏</span>
                 </router-link>
+                <router-link to="/favorites" class="dropdown-item" @click="showMyMenu = false">
+                  <span class="item-label">我的收藏</span>
+                  <span class="item-desc">收藏的帖子</span>
+                </router-link>
                 <router-link to="/friends" class="dropdown-item" @click="showMyMenu = false">
                   <span class="item-label">我的好友</span>
                   <span class="item-desc">好友列表与私聊</span>
                   <span v-if="friendUnread > 0" class="dropdown-badge">{{ friendUnread > 99 ? '99+' : friendUnread }}</span>
+                </router-link>
+                <div class="dropdown-divider" v-if="userStore.isAdmin"></div>
+                <router-link v-if="userStore.isAdmin" to="/admin" class="dropdown-item" @click="showMyMenu = false">
+                  <span class="item-label">管理后台</span>
+                  <span class="item-desc">系统数据与用户管理</span>
                 </router-link>
               </div>
             </transition>
@@ -448,6 +457,12 @@ function handleLogout() {
   font-size: 12px;
   color: var(--color-text-secondary);
   margin-top: 2px;
+}
+
+.dropdown-divider {
+  height: 1px;
+  background: #e8eaed;
+  margin: 4px 12px;
 }
 
 .dropdown-badge {

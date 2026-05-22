@@ -15,6 +15,7 @@ export const useUserStore = defineStore('user', () => {
   const isAdmin = computed(() => userInfo.value?.role === ROLES.SYS_ADMIN)
   const isGroupAdmin = computed(() => userInfo.value?.role === ROLES.GROUP_ADMIN)
   const isAnyAdmin = computed(() => isAdmin.value || isGroupAdmin.value)
+  const isRoot = computed(() => userInfo.value?.root === true)
 
   const login = async (username: string, password: string) => {
     const res = await http.post('/auth/login', { username, password })
@@ -53,6 +54,6 @@ export const useUserStore = defineStore('user', () => {
   return {
     token, userInfo, login, logout, isLogin, fetchUserInfo, waitReady,
     // ✅ 导出权限状态
-    isAdmin, isGroupAdmin, isAnyAdmin
+    isAdmin, isGroupAdmin, isAnyAdmin, isRoot
   }
 })

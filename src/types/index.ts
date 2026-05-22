@@ -14,6 +14,8 @@ export interface UserInfo {
   username: string
   email?: string
   role: string
+  status?: string
+  root?: boolean
   avatarUrl?: string
   createdAt?: string
 }
@@ -43,6 +45,7 @@ export interface Post {
   commentCount?: number
   likeCount?: number
   dislikeCount?: number
+  isFavorited?: boolean
   viewCount?: number
   currentUserReaction?: 'LIKE' | 'DISLIKE' | null
   images?: string[]

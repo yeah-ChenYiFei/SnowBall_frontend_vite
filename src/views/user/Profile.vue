@@ -3,13 +3,15 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import http from '@/api/http'
 import { useUserStore } from '@/stores/user'
+import { useFriendStore } from '@/stores/friend'
 import UserAvatar from '@/components/UserAvatar.vue'
 import ImageLightbox from '@/components/ImageLightbox.vue'
-import type { UserProfileFull, ContributionDay, RecentProject, BrowsingHistory, Activity, PublicChain } from '@/types'
+import type { UserProfileFull, ContributionDay, RecentProject, BrowsingHistory, Activity, PublicChain, FriendshipStatus } from '@/types'
 
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
+const friendStore = useFriendStore()
 
 const profile = ref<UserProfileFull | null>(null)
 const isLoading = ref(true)
@@ -22,6 +24,7 @@ const uploadingAvatar = ref(false)
 const avatarInput = ref<HTMLInputElement | null>(null)
 const lightboxUrl = ref('')
 const showLightbox = ref(false)
+const friendStatus = ref<FriendshipStatus>({ status: 'NONE' })
 
 const userId = computed(() => {
   const id = route.params.userId as string
@@ -115,6 +118,10 @@ async function loadProfile() {
         inspirations: 0,
       },
     }
+    // Check friend status for this profile (not self)
+    if (!isSelf.value && id) {
+      friendStatus.value = await friendStore.checkStatus(Number(id))
+    }
   } catch {
     profile.value = null
   } finally {
@@ -160,6 +167,17 @@ async function saveSignature() {
 
 function cancelEditSignature() {
   editingSignature.value = false
+}
+
+async function handleAddFriend() {
+  await friendStore.sendRequest(Number(userId.value), 'PROFILE')
+  friendStatus.value = { status: 'PENDING_TO_THEM' }
+}
+
+async function handleAcceptFriend() {
+  if (!friendStatus.value.friendshipId) return
+  await friendStore.acceptRequest(friendStatus.value.friendshipId)
+  friendStatus.value = { status: 'FRIEND' }
 }
 
 function goToProject(p: RecentProject) {
@@ -341,6 +359,14 @@ watch(() => route.params.userId, loadProfile)
               <span class="stat-num">{{ profile.stats.inspirations }}</span>
               <span class="stat-label">灵感</span>
             </div>
+          </div>
+
+          <!-- Friend action area -->
+          <div v-if="!isSelf" class="friend-action-area">
+            <button v-if="friendStatus.status === 'NONE'" class="btn-add-friend" @click="handleAddFriend">➕ 加好友</button>
+            <span v-else-if="friendStatus.status === 'FRIEND'" class="friend-badge">✅ 已加好友</span>
+            <span v-else-if="friendStatus.status === 'PENDING_TO_THEM'" class="friend-badge pending">⏳ 已申请</span>
+            <button v-else-if="friendStatus.status === 'PENDING_FROM_THEM'" class="btn-accept-friend" @click="handleAcceptFriend">📩 接受好友请求</button>
           </div>
         </div>
       </aside>
@@ -594,6 +620,49 @@ watch(() => route.params.userId, loadProfile)
   font-size: 12px;
   color: #999;
   margin-top: 2px;
+}
+
+.friend-action-area {
+  padding-top: 16px;
+  border-top: 1px solid #f1f3f4;
+  margin-top: 16px;
+}
+.btn-add-friend {
+  width: 100%;
+  padding: 8px 0;
+  background: #1a73e8;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.btn-add-friend:hover { background: #1557b0; }
+.btn-accept-friend {
+  width: 100%;
+  padding: 8px 0;
+  background: #e8f0fe;
+  color: #1a73e8;
+  border: 1px solid #1a73e8;
+  border-radius: 8px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.btn-accept-friend:hover { background: #d2e3fc; }
+.friend-badge {
+  display: block;
+  text-align: center;
+  padding: 8px 0;
+  font-size: 14px;
+  border-radius: 8px;
+  background: #e6f4ea;
+  color: #137333;
+}
+.friend-badge.pending {
+  background: #fef7e0;
+  color: #e37400;
 }
 
 /* ===== Right Column ===== */

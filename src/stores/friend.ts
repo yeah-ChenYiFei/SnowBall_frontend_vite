@@ -39,16 +39,24 @@ export const useFriendStore = defineStore('friend', () => {
   }
 
   async function acceptRequest(friendshipId: number) {
+    // Clear the requester's cached status before reloading
+    const req = pendingRequests.value.find(r => r.id === friendshipId)
+    if (req) statusCache.value.delete(req.userId)
     await http.put(`/friends/${friendshipId}/accept`)
     await Promise.all([loadFriends(), loadPendingRequests()])
   }
 
   async function rejectRequest(friendshipId: number) {
+    const req = pendingRequests.value.find(r => r.id === friendshipId)
+    if (req) statusCache.value.delete(req.userId)
     await http.put(`/friends/${friendshipId}/reject`)
     await loadPendingRequests()
   }
 
   async function unfriend(friendshipId: number) {
+    // Clear the unfriended user's cached status
+    const f = friends.value.find(fr => fr.id === friendshipId)
+    if (f) statusCache.value.delete(f.userId)
     await http.delete(`/friends/${friendshipId}`)
     await loadFriends()
   }

@@ -94,6 +94,14 @@ const handleReact = async (type: 'LIKE' | 'DISLIKE') => {
   }
 }
 
+const toggleFav = async () => {
+  if (!post.value) return
+  try {
+    const res = await http.post(`/posts/${route.params.id}/favorite`)
+    post.value.isFavorited = res.data
+  } catch { /* ignore */ }
+}
+
 // 普通用户：删除自己的帖子
 const handleDelete = async () => {
   if (!confirm('确定要删除这篇帖子吗？')) return
@@ -185,6 +193,12 @@ onMounted(() => { loadPost() })
             @click="handleReact('DISLIKE')"
           >👎 踩 {{ post.dislikeCount || 0 }}</button>
           <span class="action-spacer"></span>
+          <button
+            v-if="userStore.isLogin()"
+            class="action-btn"
+            :class="{ favorited: post.isFavorited }"
+            @click="toggleFav"
+          >{{ post.isFavorited ? '⭐ 已收藏' : '☆ 收藏' }}</button>
           <template v-if="isAuthor">
             <button class="action-btn" @click="router.push(`/post/${post.id}/edit`)">✏️ 编辑</button>
             <button class="action-btn" @click="router.push(`/post/${post.id}/versions`)">📜 历史</button>
@@ -275,6 +289,7 @@ onMounted(() => { loadPost() })
 .action-btn:hover { background: #f8f9fa; border-color: #d2e3fc; color: #1a73e8; }
 .action-btn.btn-danger { color: #d93025; border-color: #f28b82; }
 .action-btn.btn-danger:hover { background: #fce8e6; color: #c5221f; border-color: #f28b82; }
+.action-btn.favorited { color: #e37400; border-color: #fef7e0; background: #fef7e0; }
 .react-btn.liked { background: #e6f4ea; color: #137333; border-color: #ceead6; }
 .react-btn.disliked { background: #fce8e6; color: #c5221f; border-color: #f28b82; }
 .action-spacer { flex: 1; }

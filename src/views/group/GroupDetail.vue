@@ -7,7 +7,7 @@ import { useFriendStore } from '@/stores/friend'
 import UserAvatar from '@/components/UserAvatar.vue'
 import ImageUploadButton from '@/components/ImageUploadButton.vue'
 import ImageLightbox from '@/components/ImageLightbox.vue'
-import type { GroupDetail, GroupMemberInfo, GroupMessage, UserProfileVO, ChainDetailVO, WritingBattle, BattleEntry } from '@/types'
+import type { GroupDetail, GroupMemberInfo, GroupMessage, UserProfileVO, ChainDetailVO, WritingBattle, BattleEntry, FriendshipStatus } from '@/types'
 
 const router = useRouter()
 const route = useRoute()
@@ -63,7 +63,7 @@ const contextMenu = ref({ show: false, x: 0, y: 0, message: null as GroupMessage
 const quoteTarget = ref<GroupMessage | null>(null)
 
 // User profile popup
-const profilePopup = ref({ show: false, x: 0, y: 0, user: null as UserProfileVO | null, loading: false })
+const profilePopup = ref({ show: false, x: 0, y: 0, user: null as UserProfileVO | null, loading: false, friendStatus: { status: 'NONE' } as FriendshipStatus })
 
 // ---- Activity expand state ----
 const expandedChainId = ref<number | null>(null)
@@ -279,10 +279,14 @@ function canDeleteMessage(msg: GroupMessage): boolean {
 // ---- User profile popup ----
 async function showUserProfile(e: MouseEvent, userId: number) {
   const rect = (e.target as HTMLElement).getBoundingClientRect()
-  profilePopup.value = { show: true, x: rect.left, y: rect.bottom + 4, user: null, loading: true }
+  profilePopup.value = { show: true, x: rect.left, y: rect.bottom + 4, user: null, loading: true, friendStatus: { status: 'NONE' } }
   try {
-    const res = await http.get(`/users/${userId}/profile`)
-    profilePopup.value.user = res.data as UserProfileVO
+    const [profileRes, statusRes] = await Promise.all([
+      http.get(`/users/${userId}/profile`),
+      friendStore.checkStatus(userId)
+    ])
+    profilePopup.value.user = profileRes.data as UserProfileVO
+    profilePopup.value.friendStatus = statusRes
   } catch { profilePopup.value.show = false }
   finally { profilePopup.value.loading = false }
 }
@@ -678,7 +682,10 @@ function formatDate(iso: string): string {
             <div class="profile-actions" v-if="profilePopup.user.user.id !== currentUserId">
               <button class="profile-action-btn" @click="router.push('/profile/' + profilePopup.user.user.id); closeProfilePopup()">👤 个人主页</button>
               <button class="profile-action-btn" @click="router.push('/chat/' + profilePopup.user.user.id); closeProfilePopup()">💬 私聊</button>
-              <button class="profile-action-btn" @click="friendStore.sendRequest(profilePopup.user.user.id, 'GROUP', groupId); closeProfilePopup()">➕ 加好友</button>
+              <button v-if="profilePopup.friendStatus.status === 'NONE'" class="profile-action-btn" @click="friendStore.sendRequest(profilePopup.user.user.id, 'GROUP', groupId); profilePopup.friendStatus = { status: 'PENDING_TO_THEM' }">➕ 加好友</button>
+              <span v-else-if="profilePopup.friendStatus.status === 'FRIEND'" class="profile-friend-badge">✅ 已加好友</span>
+              <span v-else-if="profilePopup.friendStatus.status === 'PENDING_TO_THEM'" class="profile-friend-badge pending">⏳ 已申请</span>
+              <button v-else-if="profilePopup.friendStatus.status === 'PENDING_FROM_THEM'" class="profile-action-btn" @click="friendStore.acceptRequest(profilePopup.friendStatus.friendshipId!); profilePopup.friendStatus = { status: 'FRIEND' }">📩 接受好友请求</button>
             </div>
             <div class="profile-section" v-if="profilePopup.user.posts.length > 0">
               <div class="profile-section-title">最近帖子</div>
@@ -912,6 +919,11 @@ function formatDate(iso: string): string {
   border-radius: 6px; cursor: pointer; font-size: 12px; transition: background 0.15s;
 }
 .profile-action-btn:hover { background: #e8f0fe; color: #1a73e8; }
+.profile-friend-badge {
+  flex: 1; padding: 6px 10px; border-radius: 6px; font-size: 12px; text-align: center;
+  background: #e6f4ea; color: #137333;
+}
+.profile-friend-badge.pending { background: #fef7e0; color: #e37400; }
 .profile-section { margin-top: 8px; }
 .profile-section-title { font-size: 12px; font-weight: 500; color: #5f6368; margin-bottom: 6px; }
 .profile-post { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid #f1f3f4; font-size: 13px; }

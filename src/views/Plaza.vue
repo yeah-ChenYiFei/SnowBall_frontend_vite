@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import http from '@/api/http'
 import PostCard from '@/components/PostCard.vue'
@@ -30,6 +30,7 @@ function onAuthorLeave() {
 const posts = ref<Post[]>([])
 const isLoadingPosts = ref(false)
 const showCreatePost = ref(false)
+const sort = ref('new')
 
 const diaryStreak = ref(0)
 const isLoadingStreak = ref(false)
@@ -41,12 +42,8 @@ const isLoadingInspirations = ref(false)
 const loadPosts = async () => {
   isLoadingPosts.value = true
   try {
-    const res = await http.get('/posts')
-    posts.value = (res.data || [])
-      .filter((p: Post) => p.type === 'THOUGHT')
-      .sort((a: Post, b: Post) =>
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-      )
+    const res = await http.get('/posts', { params: { sort: sort.value } })
+    posts.value = (res.data || []).filter((p: Post) => p.type === 'THOUGHT')
   } catch {
     // silent
   } finally {
@@ -132,6 +129,8 @@ onMounted(() => {
   loadStreak()
   loadInspirations()
 })
+
+watch(sort, () => loadPosts())
 </script>
 
 <template>
@@ -150,6 +149,12 @@ onMounted(() => {
         >
           ✍️ 发帖
         </button>
+      </div>
+
+      <div class="sort-tabs">
+        <button :class="['sort-tab', { active: sort === 'hot' }]" @click="sort = 'hot'">热门</button>
+        <button :class="['sort-tab', { active: sort === 'new' }]" @click="sort = 'new'">最新</button>
+        <button :class="['sort-tab', { active: sort === 'top' }]" @click="sort = 'top'">最多赞</button>
       </div>
 
       <div v-if="isLoadingPosts" class="loading-state">加载中...</div>
@@ -265,6 +270,31 @@ onMounted(() => {
   color: #999;
   display: block;
   margin-top: 2px;
+}
+
+.sort-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.sort-tab {
+  padding: 6px 18px;
+  border: 1px solid #dadce0;
+  background: #fff;
+  border-radius: 20px;
+  font-size: 13px;
+  color: #5f6368;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.sort-tab:hover {
+  border-color: #1a73e8;
+  color: #1a73e8;
+}
+.sort-tab.active {
+  background: #1a73e8;
+  color: #fff;
+  border-color: #1a73e8;
 }
 
 .btn-create-post {
