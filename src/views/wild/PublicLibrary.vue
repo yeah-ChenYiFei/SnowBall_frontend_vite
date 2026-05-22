@@ -5,22 +5,92 @@ import http from '@/api/http'
 import type { PublishedArticle } from '@/types'
 
 const router = useRouter()
-const articles = ref<PublishedArticle[]>([])
 const isLoading = ref(false)
 
 const typeLabel: Record<string, string> = { NOVEL: '小说', ESSAY: '散文' }
 
+interface BookCard {
+  id: string
+  type: string
+  title: string
+  authorName: string
+  userId: number
+  worldName: string
+  publishedAt: string
+  createdAt: string
+  updatedAt: string
+  // single essay
+  articleId?: number
+  preview?: string
+  wordCount: number
+  // novel
+  novelId?: number
+  description?: string
+  chapterCount?: number
+}
+
+const displayCards = ref<BookCard[]>([])
+
 async function loadArticles() {
   isLoading.value = true
   try {
-    const res = await http.get<PublishedArticle[]>('/articles/published')
-    articles.value = res.data || []
+    const [articleRes, novelRes] = await Promise.all([
+      http.get<PublishedArticle[]>('/articles/published'),
+      http.get('/novels/published').catch(() => ({ data: [] })),
+    ])
+    const articles = articleRes.data || []
+    const novels = (novelRes.data || []) as any[]
+
+    const cards: BookCard[] = []
+
+    for (const a of articles) {
+      if (a.type === 'NOVEL') continue // migrated, use novel API instead
+      cards.push({
+        id: `essay:${a.id}`,
+        type: a.type,
+        title: a.title,
+        authorName: a.authorName || '匿名',
+        userId: a.userId,
+        worldName: a.worldName || '',
+        publishedAt: a.publishedAt,
+        createdAt: a.createdAt,
+        updatedAt: a.updatedAt,
+        articleId: a.id,
+        preview: a.body?.substring(0, 150) || '',
+        wordCount: a.wordCount || 0,
+      })
+    }
+
+    for (const n of novels) {
+      cards.push({
+        id: `novel:${n.id}`,
+        type: 'NOVEL',
+        title: n.title,
+        authorName: n.authorName || '匿名',
+        userId: n.userId,
+        worldName: n.worldName || '',
+        publishedAt: n.publishedAt,
+        createdAt: n.createdAt,
+        updatedAt: n.updatedAt,
+        novelId: n.id,
+        description: n.description,
+        chapterCount: n.chapterCount,
+        wordCount: n.totalWordCount || 0,
+      })
+    }
+
+    cards.sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime())
+    displayCards.value = cards
   } catch { /* */ }
   finally { isLoading.value = false }
 }
 
-function goToArticle(id: number) {
-  router.push(`/wild/library/${id}`)
+function goToCard(card: BookCard) {
+  if (card.type === 'NOVEL' && card.novelId) {
+    router.push(`/wild/library/novel/${card.novelId}`)
+  } else if (card.articleId) {
+    router.push(`/wild/library/${card.articleId}`)
+  }
 }
 
 const formatDate = (iso: string) => new Date(iso).toLocaleDateString('zh-CN')
@@ -37,30 +107,33 @@ onMounted(loadArticles)
 
     <div v-if="isLoading" class="loading-state">加载中...</div>
 
-    <div v-else-if="articles.length === 0" class="empty-state">
+    <div v-else-if="displayCards.length === 0" class="empty-state">
       <div class="empty-icon">📚</div>
       <div class="empty-text">还没有发布的作品，去创作中心发布你的作品吧</div>
     </div>
 
     <div v-else class="library-grid">
       <article
-        v-for="a in articles"
-        :key="a.id"
+        v-for="card in displayCards"
+        :key="card.id"
         class="library-card"
-        @click="goToArticle(a.id)"
+        @click="goToCard(card)"
       >
         <div class="lib-card-top">
-          <span class="lib-type" :class="a.type === 'NOVEL' ? 'novel' : 'essay'">
-            {{ typeLabel[a.type] || a.type }}
+          <span class="lib-type" :class="card.type === 'NOVEL' ? 'novel' : 'essay'">
+            {{ typeLabel[card.type] || card.type }}
           </span>
-          <span class="lib-words">{{ a.wordCount || 0 }} 字</span>
+          <span class="lib-words">{{ card.wordCount || 0 }} 字</span>
         </div>
-        <h3 class="lib-title">{{ a.title }}</h3>
-        <p v-if="a.body" class="lib-preview">{{ a.body.substring(0, 150) }}{{ a.body.length > 150 ? '...' : '' }}</p>
+        <h3 class="lib-title">{{ card.title }}</h3>
+        <p v-if="card.description" class="lib-desc">{{ card.description.substring(0, 150) }}{{ card.description.length > 150 ? '...' : '' }}</p>
+        <p v-else-if="card.preview" class="lib-preview">{{ card.preview }}{{ (card.preview?.length || 0) >= 150 ? '...' : '' }}</p>
         <div class="lib-footer">
-          <span class="lib-author">👤 {{ a.authorName || '匿名' }}</span>
-          <span v-if="a.publishedAt" class="lib-date">{{ formatDate(a.publishedAt) }}</span>
-          <span v-if="a.worldName" class="lib-world">📖 {{ a.worldName }}</span>
+          <span class="lib-author">👤 {{ card.authorName || '匿名' }}</span>
+          <span v-if="card.chapterCount" class="lib-chapters">{{ card.chapterCount }} 章</span>
+          <span v-if="card.worldName" class="lib-world">📖 {{ card.worldName }}</span>
+          <span class="lib-date">创建于 {{ formatDate(card.createdAt) }}</span>
+          <span v-if="card.updatedAt && card.updatedAt !== card.createdAt" class="lib-date">更新于 {{ formatDate(card.updatedAt) }}</span>
         </div>
       </article>
     </div>
@@ -108,6 +181,7 @@ onMounted(loadArticles)
   font-size: 14px; color: #5f6368; line-height: 1.6; margin: 0 0 16px 0;
   display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
 }
+.lib-chapters { font-size: 13px; color: #1a73e8; margin: 0 0 10px 0; font-weight: 500; }
 .lib-footer { display: flex; gap: 16px; font-size: 13px; color: #5f6368; flex-wrap: wrap; }
 .lib-author { color: #333; }
 .lib-date { color: #999; }

@@ -4,6 +4,22 @@ import { useRouter } from 'vue-router'
 import http from '@/api/http'
 import type { Article, ArticleType } from '@/types'
 import { ArticleTypeLabel } from '@/types'
+import { decodeChapter, isConfigPost, SectionTypeOrder } from '@/utils/chapterCodec'
+
+interface CardItem {
+  id: number
+  type: string
+  title: string
+  body: string
+  chapter?: string
+  wordCount: number
+  createdAt: string
+  authorName?: string
+  description?: string
+  chapterCount?: number
+  worldName?: string
+  navigateTo: string
+}
 
 const router = useRouter()
 const articles = ref<Article[]>([])
@@ -13,11 +29,24 @@ const isAnimating = ref(false)
 const direction = ref<'left' | 'right'>('right')
 let autoTimer: ReturnType<typeof setInterval> | null = null
 
-const articleList = computed(() =>
-  articles.value.filter((a) =>
-    ['ESSAY', 'DIARY', 'NOVEL'].includes(a.type),
-  ),
-)
+const articleList = computed(() => {
+  const filtered = articles.value.filter(a =>
+    ['ESSAY', 'DIARY'].includes(a.type),
+  )
+  // Map essays/diaries to CardItems
+  const items: CardItem[] = filtered.map(a => ({
+    id: a.id,
+    type: a.type,
+    title: a.title,
+    body: a.body || '',
+    chapter: a.chapter,
+    wordCount: a.wordCount || 0,
+    createdAt: a.createdAt,
+    navigateTo: `/writing/${a.id}`,
+  }))
+  // Merge with novels
+  return [...items, ...novelCards.value]
+})
 
 const hoveredCardId = ref<number | null>(null)
 const hoveredPosition = ref<'left' | 'center' | 'right' | 'behind' | null>(null)
@@ -30,15 +59,15 @@ const visibleCards = computed(() => {
   const nextIdx = (currentIndex.value + 1) % len
   const behindIdx = (currentIndex.value - 2 + len) % len
 
-  // Build card list, deduplicate by article id (handles len < 4)
+  // Build card list, deduplicate by card id (handles len < 4)
   const seen = new Set<number>()
-  const cards: { article: Article; position: 'behind' | 'left' | 'center' | 'right' }[] = []
+  const cards: { item: CardItem; position: 'behind' | 'left' | 'center' | 'right' }[] = []
 
   const addCard = (idx: number, pos: 'behind' | 'left' | 'center' | 'right') => {
-    const article = list[idx]
-    if (!seen.has(article.id)) {
-      seen.add(article.id)
-      cards.push({ article, position: pos })
+    const item = list[idx]
+    if (!seen.has(item.id)) {
+      seen.add(item.id)
+      cards.push({ item, position: pos })
     }
   }
 
@@ -69,6 +98,14 @@ function goToArticle(id: number) {
   router.push(`/writing/${id}`)
 }
 
+function goToCard(item: CardItem) {
+  if (item.type === 'NOVEL') {
+    router.push(item.navigateTo)
+  } else {
+    router.push(`/writing/${item.id}`)
+  }
+}
+
 function startAutoRotate() {
   stopAutoRotate()
   autoTimer = setInterval(() => {
@@ -88,16 +125,40 @@ function resetAutoRotate() {
   startAutoRotate()
 }
 
+const novelCards = ref<CardItem[]>([])
+
 async function loadArticles() {
   isLoading.value = true
   try {
-    const res = await http.get('/articles')
-    articles.value = (res.data || []) as Article[]
+    const [articleRes, novelRes] = await Promise.all([
+      http.get('/articles', { params: { type: 'ESSAY,DIARY' } }),
+      http.get('/novels').catch(() => ({ data: [] })),
+    ])
+    articles.value = (articleRes.data || []) as Article[]
+    const novels = (novelRes.data || []) as any[]
+    novelCards.value = novels.map((n: any) => ({
+      id: n.id,
+      type: 'NOVEL',
+      title: n.title,
+      body: n.description || '',
+      wordCount: n.totalWordCount || 0,
+      createdAt: n.createdAt,
+      authorName: n.authorName,
+      description: n.description,
+      chapterCount: n.chapterCount,
+      worldName: n.worldName,
+      chapter: '',
+      navigateTo: `/writing/${n.id}?novelId=${n.id}`,
+    }))
   } catch {
     // silent fail, show empty state
   } finally {
     isLoading.value = false
   }
+}
+
+function goToNovel(item: CardItem) {
+  router.push(item.navigateTo)
 }
 
 onMounted(() => {
@@ -127,8 +188,12 @@ const typeBadgeClass = (type: ArticleType) => ({
 
 function displayChapter(chapter?: string): string {
   if (!chapter) return ''
-  const cleaned = chapter.replace(/\$\$cfg:[^$]*\$\$/g, '').trim()
-  return cleaned && !cleaned.startsWith('$$') ? cleaned : ''
+  if (isConfigPost(chapter)) return ''
+  try {
+    return decodeChapter(chapter).title
+  } catch {
+    return ''
+  }
 }
 
 async function togglePublish(article: Article) {
@@ -177,43 +242,46 @@ async function togglePublish(article: Article) {
         <div class="cards-deck" :class="{ 'anim-left': isAnimating && direction === 'left', 'anim-right': isAnimating && direction === 'right' }">
           <div
             v-for="card in visibleCards"
-            :key="card.article.id"
+            :key="card.item.id + card.item.type"
             :class="[
               'article-card',
               `card-${card.position}`,
-              { 'card-hovered': hoveredCardId === card.article.id },
+              { 'card-hovered': hoveredCardId === card.item.id },
               {
                 'card-semi-dimmed':
                   hoveredCardId !== null &&
-                  hoveredCardId !== card.article.id &&
+                  hoveredCardId !== card.item.id &&
                   card.position === 'center' &&
                   hoveredPosition !== 'center',
               },
               {
                 'card-full-dimmed':
                   hoveredCardId !== null &&
-                  hoveredCardId !== card.article.id &&
+                  hoveredCardId !== card.item.id &&
                   !(card.position === 'center' && hoveredPosition !== 'center'),
               },
             ]"
-            @click="goToArticle(card.article.id)"
-            @mouseenter="hoveredCardId = card.article.id; hoveredPosition = card.position"
+            @click="goToCard(card.item)"
+            @mouseenter="hoveredCardId = card.item.id; hoveredPosition = card.position"
             @mouseleave="hoveredCardId = null; hoveredPosition = null"
           >
             <div class="card-inner">
               <div class="card-type-row">
-                <span :class="typeBadgeClass(card.article.type as ArticleType)">
-                  {{ ArticleTypeLabel[card.article.type as ArticleType] || card.article.type }}
+                <span :class="typeBadgeClass(card.item.type as ArticleType)">
+                  {{ ArticleTypeLabel[card.item.type as ArticleType] || card.item.type }}
                 </span>
               </div>
-              <h3 class="card-title">{{ card.article.title }}</h3>
-              <p v-if="displayChapter(card.article.chapter)" class="card-chapter">{{ displayChapter(card.article.chapter) }}</p>
-              <p class="card-body">
-                {{ card.article.body?.substring(0, 180) }}{{ card.article.body?.length > 180 ? '...' : '' }}
+              <h3 class="card-title">{{ card.item.title }}</h3>
+              <p v-if="displayChapter(card.item.chapter)" class="card-chapter">{{ displayChapter(card.item.chapter) }}</p>
+              <p v-if="card.item.description" class="card-desc">{{ card.item.description?.substring(0, 120) }}{{ (card.item.description?.length || 0) > 120 ? '...' : '' }}</p>
+              <p v-else class="card-body">
+                {{ card.item.body?.substring(0, 180) }}{{ (card.item.body?.length || 0) > 180 ? '...' : '' }}
               </p>
               <div class="card-footer">
-                <span class="card-date">{{ new Date(card.article.createdAt).toLocaleDateString('zh-CN') }}</span>
-                <span v-if="card.article.wordCount" class="card-words">{{ card.article.wordCount }} 字</span>
+                <span v-if="card.item.chapterCount" class="card-chapters">{{ card.item.chapterCount }} 章</span>
+                <span v-if="card.item.worldName" class="card-world">📖 {{ card.item.worldName }}</span>
+                <span class="card-date">{{ new Date(card.item.createdAt).toLocaleDateString('zh-CN') }}</span>
+                <span v-if="card.item.wordCount" class="card-words">{{ card.item.wordCount }} 字</span>
               </div>
             </div>
           </div>
@@ -437,6 +505,30 @@ async function togglePublish(article: Article) {
   font-size: 14px;
   color: #1a73e8;
   margin: 0 0 10px 0;
+  font-weight: 500;
+}
+
+.card-desc {
+  flex: 1;
+  font-size: 14px;
+  color: #5f6368;
+  line-height: 1.8;
+  margin: 0 0 10px 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+}
+
+.card-world {
+  font-size: 12px;
+  color: #1a73e8;
+}
+
+.card-chapters {
+  font-size: 12px;
+  color: #1a73e8;
   font-weight: 500;
 }
 

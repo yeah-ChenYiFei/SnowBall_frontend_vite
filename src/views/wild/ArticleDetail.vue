@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import http from '@/api/http'
 import { useUserStore } from '@/stores/user'
 import type { PublishedArticle, GenericComment } from '@/types'
+import { decodeChapter, isConfigPost, SectionTypeOrder } from '@/utils/chapterCodec'
 
 const route = useRoute()
 const router = useRouter()
@@ -13,6 +14,12 @@ const articleId = Number(route.params.id)
 const article = ref<PublishedArticle | null>(null)
 const isLoading = ref(true)
 
+// Chapter navigation for novels
+interface ChapterNavItem { id: number; section: string; volume: number; chapter: number; title: string }
+const chapterNav = ref<ChapterNavItem[]>([])
+const prevChapter = ref<ChapterNavItem | null>(null)
+const nextChapter = ref<ChapterNavItem | null>(null)
+
 // Comments
 const comments = ref<GenericComment[]>([])
 const newComment = ref('')
@@ -20,13 +27,64 @@ const isLoadingComments = ref(false)
 
 const typeLabel: Record<string, string> = { NOVEL: '小说', ESSAY: '散文', DIARY: '日记' }
 
+const currentChapterTitle = computed(() => {
+  if (!article.value?.chapter) return ''
+  if (isConfigPost(article.value.chapter)) return ''
+  try {
+    return decodeChapter(article.value.chapter).title
+  } catch {
+    return ''
+  }
+})
+
 const loadArticle = async () => {
   isLoading.value = true
   try {
     const res = await http.get<PublishedArticle>(`/articles/${articleId}`)
     article.value = res.data
+    if (article.value.type === 'NOVEL' && article.value.chapter && !isConfigPost(article.value.chapter)) {
+      loadChapterNav()
+    }
   } catch { /* */ }
   finally { isLoading.value = false }
+}
+
+const loadChapterNav = async () => {
+  try {
+    const res = await http.get<PublishedArticle[]>('/articles/published')
+    const allPublished = res.data || []
+    const title = article.value!.title
+    const userId = article.value!.userId
+
+    const chapters: ChapterNavItem[] = []
+    for (const a of allPublished) {
+      if (a.type !== 'NOVEL') continue
+      if (a.title !== title) continue
+      if (a.userId !== userId) continue
+      if (!a.chapter || isConfigPost(a.chapter)) continue
+      try {
+        const info = decodeChapter(a.chapter)
+        chapters.push({ id: a.id, section: info.section, volume: info.volume, chapter: info.chapter, title: info.title })
+      } catch { /* skip malformed */ }
+    }
+
+    chapters.sort((a, b) => {
+      const sa = SectionTypeOrder.indexOf(a.section as any)
+      const sb = SectionTypeOrder.indexOf(b.section as any)
+      if (sa !== sb) return sa - sb
+      if (a.volume !== b.volume) return a.volume - b.volume
+      return a.chapter - b.chapter
+    })
+
+    chapterNav.value = chapters
+    const curIdx = chapters.findIndex(c => c.id === articleId)
+    if (curIdx > 0) prevChapter.value = chapters[curIdx - 1]
+    if (curIdx >= 0 && curIdx < chapters.length - 1) nextChapter.value = chapters[curIdx + 1]
+  } catch { /* */ }
+}
+
+const goToChapter = (id: number) => {
+  router.push(`/wild/library/${id}`)
 }
 
 const loadComments = async () => {
@@ -79,6 +137,7 @@ onMounted(() => { loadArticle(); loadComments() })
         </div>
 
         <h1 class="article-title">{{ article.title }}</h1>
+        <p v-if="currentChapterTitle" class="article-chapter">{{ currentChapterTitle }}</p>
 
         <div class="article-meta">
           <span class="meta-author" @click="router.push(`/profile/${article.userId}`)">
@@ -97,6 +156,17 @@ onMounted(() => { loadArticle(); loadComments() })
 
         <div class="article-body">
           <p v-for="(line, i) in (article.body || '').split('\n')" :key="i">{{ line }}</p>
+        </div>
+
+        <!-- Chapter navigation -->
+        <div v-if="prevChapter || nextChapter" class="chapter-nav">
+          <button v-if="prevChapter" class="nav-btn nav-prev" @click="goToChapter(prevChapter.id)">
+            ← {{ prevChapter.title }}
+          </button>
+          <span v-else class="nav-spacer"></span>
+          <button v-if="nextChapter" class="nav-btn nav-next" @click="goToChapter(nextChapter.id)">
+            {{ nextChapter.title }} →
+          </button>
         </div>
       </article>
 
@@ -136,7 +206,8 @@ onMounted(() => { loadArticle(); loadComments() })
 .article-type.novel { background: #fce8e6; color: #c5221f; }
 .article-type.essay { background: #e6f4ea; color: #137333; }
 .article-words { font-size: 13px; color: #999; }
-.article-title { font-size: 28px; font-weight: 700; color: #202124; margin: 0 0 16px 0; }
+.article-title { font-size: 28px; font-weight: 700; color: #202124; margin: 0 0 6px 0; }
+.article-chapter { font-size: 15px; color: #5f6368; margin: 0 0 16px 0; }
 .article-meta { display: flex; gap: 16px; font-size: 13px; color: #5f6368; margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid #f1f3f4; }
 .meta-author { cursor: pointer; color: #1a73e8; font-weight: 500; }
 .meta-author:hover { text-decoration: underline; }
@@ -146,6 +217,10 @@ onMounted(() => { loadArticle(); loadComments() })
 .article-world-link a:hover { text-decoration: underline; }
 .article-body { font-size: 16px; line-height: 1.8; color: #333; }
 .article-body p { margin: 0 0 16px 0; }
+.chapter-nav { display: flex; justify-content: space-between; align-items: center; margin-top: 28px; padding-top: 20px; border-top: 1px solid #f1f3f4; gap: 12px; }
+.nav-btn { padding: 10px 18px; background: #f8f9fa; border: 1px solid #dadce0; border-radius: 8px; cursor: pointer; font-size: 14px; color: #1a73e8; transition: background 0.2s; max-width: 48%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nav-btn:hover { background: #e8f0fe; }
+.nav-spacer { flex: 1; }
 
 /* Comments */
 .comments-section { background: #fff; border-radius: 14px; padding: 24px; box-shadow: 0 1px 4px rgba(0,0,0,0.05); border: 1px solid #f1f3f4; }

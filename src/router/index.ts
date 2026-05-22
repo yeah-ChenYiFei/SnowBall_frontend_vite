@@ -40,6 +40,7 @@ import PublicWorlds from '@/views/wild/PublicWorlds.vue'
 import PublicWorldDetail from '@/views/wild/PublicWorldDetail.vue'
 import PublicLibrary from '@/views/wild/PublicLibrary.vue'
 import ArticleDetail from '@/views/wild/ArticleDetail.vue'
+import NovelReader from '@/views/wild/NovelReader.vue'
 import AdminDashboard from '@/views/admin/Dashboard.vue'
 import AdminUserList from '@/views/admin/UserList.vue'
 import AdminArticleList from '@/views/admin/ArticleList.vue'
@@ -89,6 +90,7 @@ const router = createRouter({
     { path: '/wild/worlds', component: PublicWorlds },
     { path: '/wild/worlds/:id', component: PublicWorldDetail },
     { path: '/wild/library', component: PublicLibrary },
+    { path: '/wild/library/novel/:id', component: NovelReader },
     { path: '/wild/library/:id', component: ArticleDetail },
 
     // 管理后台

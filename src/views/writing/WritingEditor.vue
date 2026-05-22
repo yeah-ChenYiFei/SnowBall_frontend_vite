@@ -29,6 +29,13 @@ const editId = computed(() => {
 
 const isEditMode = computed(() => editId.value !== null)
 
+const novelId = computed(() => {
+  const nid = route.query.novelId
+  if (nid) return Number(nid)
+  // Fallback: if editId is set and we detect it's a novel (determined after load)
+  return null
+})
+
 const articleType = ref<ArticleType>('ESSAY')
 const title = ref('')
 const chapter = ref('')
@@ -46,6 +53,8 @@ const typeStates = ref<Record<ArticleType, { title: string; content: string; cha
 
 // ===== Novel-specific state =====
 const novelPhase = ref<'create' | 'write'>('create')
+const novelDescription = ref('')
+const novelBindWorldId = ref<number | null>(null)
 const sectionType = ref<SectionType>('main')
 const novelHasVolumes = ref(false)
 const currentVolume = ref(1)
@@ -64,14 +73,17 @@ const aiOutput = ref('')
 const aiLoading = ref(false)
 
 async function handleAiContinue() {
-  if (!editId.value) {
+  if (!novelConfigId.value) {
     message.value = '请先保存章节后再使用AI续写'
     return
   }
   aiLoading.value = true
   aiOutput.value = ''
   try {
-    const res = await http.post('/ai/continue', { articleId: editId.value })
+    const res = await http.post('/ai/continue', {
+      novelId: novelConfigId.value,
+      currentBody: content.value,
+    })
     const data = res.data as { continuation: string; model: string; tokensUsed: number }
     aiOutput.value = data.continuation
   } catch (e: any) {
@@ -97,12 +109,22 @@ async function loadAccessibleWorlds() {
   } catch { /* */ }
 }
 
+function getNovelApiBase(): string {
+  return novelConfigId.value ? `/novels/${novelConfigId.value}` : `/articles/${editId.value}`
+}
+
+function isNovelMode(): boolean {
+  return articleType.value === 'NOVEL' && novelConfigId.value !== null
+}
+
 async function togglePublish() {
-  if (!editId.value) return
+  const base = isNovelMode() ? getNovelApiBase() : `/articles/${editId.value}`
+  if (isNovelMode() && !novelConfigId.value) return
+  if (!isNovelMode() && !editId.value) return
   try {
     const endpoint = isPublished.value
-      ? `/articles/${editId.value}/unpublish`
-      : `/articles/${editId.value}/publish`
+      ? `${base}/unpublish`
+      : `${base}/publish`
     const res = await http.post(endpoint)
     const data = res.data
     isPublished.value = (data as any).isPublished
@@ -110,9 +132,12 @@ async function togglePublish() {
 }
 
 async function handleBindWorld() {
-  if (!editId.value || !bindWorldId.value) return
+  if (!bindWorldId.value) return
+  const base = isNovelMode() ? getNovelApiBase() : `/articles/${editId.value}`
+  if (isNovelMode() && !novelConfigId.value) return
+  if (!isNovelMode() && !editId.value) return
   try {
-    const res = await http.put(`/articles/${editId.value}/bind-world`, { worldId: bindWorldId.value })
+    const res = await http.put(`${base}/bind-world`, { worldId: bindWorldId.value })
     const data = res.data as any
     currentWorldId.value = data.worldId
     worldName.value = data.worldName || ''
@@ -120,9 +145,11 @@ async function handleBindWorld() {
 }
 
 async function handleUnbindWorld() {
-  if (!editId.value) return
+  const base = isNovelMode() ? getNovelApiBase() : `/articles/${editId.value}`
+  if (isNovelMode() && !novelConfigId.value) return
+  if (!isNovelMode() && !editId.value) return
   try {
-    await http.delete(`/articles/${editId.value}/bind-world`)
+    await http.delete(`${base}/bind-world`)
     currentWorldId.value = null
     worldName.value = ''
     bindWorldId.value = 0
@@ -188,6 +215,54 @@ const selectableChapters = computed(() => {
   return chs
 })
 
+// Sorted chapters for prev/next navigation
+const sortedChapters = computed(() => {
+  const list = [...novelChapters.value]
+  list.sort((a, b) => {
+    const sa = SectionTypeOrder.indexOf(a.section)
+    const sb = SectionTypeOrder.indexOf(b.section)
+    if (sa !== sb) return sa - sb
+    if (a.volume !== b.volume) return a.volume - b.volume
+    return a.chapter - b.chapter
+  })
+  return list
+})
+
+const currentChapterNavIndex = computed(() => {
+  return sortedChapters.value.findIndex(
+    c =>
+      c.section === sectionType.value &&
+      (novelHasVolumes.value ? c.volume === currentVolume.value : true) &&
+      c.chapter === currentChapter.value,
+  )
+})
+
+const hasPrevChapter = computed(() => currentChapterNavIndex.value > 0)
+const hasNextChapter = computed(() =>
+  currentChapterNavIndex.value >= 0 &&
+  currentChapterNavIndex.value < sortedChapters.value.length - 1,
+)
+
+function goToPrevChapter() {
+  if (!hasPrevChapter.value) return
+  const prev = sortedChapters.value[currentChapterNavIndex.value - 1]
+  sectionType.value = prev.section
+  currentVolume.value = prev.volume || 1
+  currentChapter.value = prev.chapter
+  chapterTitle.value = prev.title
+  content.value = prev.body
+}
+
+function goToNextChapter() {
+  if (!hasNextChapter.value) return
+  const next = sortedChapters.value[currentChapterNavIndex.value + 1]
+  sectionType.value = next.section
+  currentVolume.value = next.volume || 1
+  currentChapter.value = next.chapter
+  chapterTitle.value = next.title
+  content.value = next.body
+}
+
 const autoGeneratedTitle = computed(() =>
   generateChapterTitle(
     sectionType.value,
@@ -237,6 +312,13 @@ async function loadArticle() {
   if (!editId.value) return
   isLoading.value = true
   try {
+    // Check if we're loading a new-system novel
+    if (novelId.value) {
+      await loadNovelChapters(novelId.value)
+      articleType.value = 'NOVEL'
+      return
+    }
+
     const res = await http.get(`/articles/${editId.value}`)
     const data = res.data
     articleType.value = data.type as ArticleType
@@ -247,20 +329,19 @@ async function loadArticle() {
     if (articleType.value === 'NOVEL') {
       chapter.value = ''
       if (isConfigPost(ch)) {
-        // This is a novel config post → load all chapters and enter write phase
-        const cfg = decodeNovelConfig(ch)
-        if (cfg) novelHasVolumes.value = cfg.hasVolumes
+        // Old config post — migrate to new system
         novelConfigId.value = data.id
         novelPhase.value = 'write'
-        await loadNovelChapters(data.title)
-        // Default to main section, first chapter
+        const cfg = decodeNovelConfig(ch)
+        if (cfg) novelHasVolumes.value = cfg.hasVolumes
+        await loadNovelChaptersLegacy(data.title)
         sectionType.value = 'main'
         currentVolume.value = 1
-        currentChapter.value = nextChapterNumber.value
+        currentChapter.value = 1
+        loadExistingChapterContent()
         chapterTitle.value = autoGeneratedTitle.value
-        content.value = ''
       } else if (ch) {
-        // This is a chapter post → decode, load all chapters, enter write phase
+        // Old chapter post — decode and load all chapters
         const info = decodeChapter(ch)
         sectionType.value = info.section
         novelHasVolumes.value = info.volume > 0
@@ -268,10 +349,8 @@ async function loadArticle() {
         currentChapter.value = info.chapter
         chapterTitle.value = info.title
         novelPhase.value = 'write'
-        await loadNovelChapters(data.title)
-        // Update novelConfigId from loaded chapters
+        await loadNovelChaptersLegacy(data.title)
       } else {
-        // Legacy NOVEL post without encoding → treat as needing creation
         novelPhase.value = 'create'
       }
     } else {
@@ -288,6 +367,35 @@ async function loadArticle() {
   } finally {
     isLoading.value = false
   }
+}
+
+// Legacy loader for old Article-based novels
+async function loadNovelChaptersLegacy(bookName: string) {
+  try {
+    const res = await http.get('/articles', { params: { search: bookName, type: 'NOVEL' } })
+    const allPosts = (res.data || []) as any[]
+    novelChapters.value = []
+    for (const post of allPosts) {
+      if (post.type !== 'NOVEL') continue
+      const ch = post.chapter || ''
+      if (isConfigPost(ch)) {
+        novelConfigId.value = post.id
+        const cfg = decodeNovelConfig(ch)
+        if (cfg) novelHasVolumes.value = cfg.hasVolumes
+        continue
+      }
+      if (!ch) continue
+      const info = decodeChapter(ch)
+      novelChapters.value.push({
+        postId: post.id,
+        section: info.section,
+        volume: info.volume,
+        chapter: info.chapter,
+        title: info.title,
+        body: post.body || '',
+      })
+    }
+  } catch { /* */ }
 }
 
 async function handleSave() {
@@ -327,38 +435,37 @@ async function handleSave() {
 
 // ===== Novel-specific methods =====
 
-async function loadNovelChapters(bookName: string) {
+async function loadNovelChapters(novelId: number) {
   isLoading.value = true
   try {
-    const res = await http.get('/articles', { params: { search: bookName, type: 'NOVEL' } })
-    const allPosts = (res.data || []) as any[]
+    const res = await http.get(`/novels/${novelId}`)
+    const data = res.data as any
+    title.value = data.title
+    novelDescription.value = data.description || ''
+    novelHasVolumes.value = data.hasVolumes || false
+    novelConfigId.value = data.id
+    isPublished.value = data.isPublished || false
+    currentWorldId.value = data.worldId || null
+    worldName.value = data.worldName || ''
+    bindWorldId.value = data.worldId || 0
 
-    novelChapters.value = []
-    novelConfigId.value = null
+    novelChapters.value = (data.chapters || []).map((c: any) => ({
+      postId: c.id,
+      section: c.section as SectionType,
+      volume: c.volumeNumber,
+      chapter: c.chapterNumber,
+      title: c.title,
+      body: c.body || '',
+    }))
 
-    for (const post of allPosts) {
-      if (post.type !== 'NOVEL') continue
-      const ch = post.chapter || ''
-      if (isConfigPost(ch)) {
-        novelConfigId.value = post.id
-        const cfg = decodeNovelConfig(ch)
-        if (cfg) novelHasVolumes.value = cfg.hasVolumes
-        continue
-      }
-      if (!ch) continue
-      const info = decodeChapter(ch)
-      novelChapters.value.push({
-        postId: post.id,
-        section: info.section,
-        volume: info.volume,
-        chapter: info.chapter,
-        title: info.title,
-        body: post.body || '',
-      })
-    }
-
-    if (novelConfigId.value !== null) {
+    if (novelChapters.value.length > 0) {
       novelPhase.value = 'write'
+      // Default to first chapter
+      const first = novelChapters.value[0]
+      sectionType.value = first.section
+      currentVolume.value = first.volume || 1
+      currentChapter.value = first.chapter
+      loadExistingChapterContent()
     }
   } catch {
     // silent
@@ -375,19 +482,22 @@ async function createNovelBook() {
   isSubmitting.value = true
   message.value = ''
   try {
-    const res = await http.post('/articles', {
-      type: 'NOVEL',
+    const res = await http.post('/novels', {
       title: title.value.trim(),
-      body: '',
-      chapter: encodeNovelConfig({ hasVolumes: novelHasVolumes.value }),
+      description: novelDescription.value,
+      hasVolumes: novelHasVolumes.value,
+      worldId: novelBindWorldId.value || undefined,
     })
-    novelConfigId.value = res.data.id
+    const data = res.data as any
+    novelConfigId.value = data.id
     novelPhase.value = 'write'
     sectionType.value = 'main'
     currentVolume.value = 1
     currentChapter.value = 1
     chapterTitle.value = autoGeneratedTitle.value
     content.value = ''
+    // Update route to include novelId for subsequent loads
+    router.replace({ path: `/writing/${data.id}`, query: { novelId: data.id } })
   } catch (e: any) {
     message.value = e.message || '创建失败'
   } finally {
@@ -400,34 +510,28 @@ async function saveNovelChapter() {
     message.value = '章节内容不能为空'
     return
   }
+  if (!novelConfigId.value) return
   isSubmitting.value = true
   message.value = ''
   try {
-    const info: ChapterInfo = {
+    const chapterData = {
       section: sectionType.value,
-      volume: novelHasVolumes.value ? currentVolume.value : 0,
-      chapter: currentChapter.value,
+      volumeNumber: novelHasVolumes.value ? currentVolume.value : 0,
+      chapterNumber: currentChapter.value,
       title: chapterTitle.value,
+      body: content.value,
     }
-    const encoded = encodeChapter(info)
 
     const existingId = existingChapterPostId.value
     if (existingId) {
-      await http.put(`/articles/${existingId}`, {
-        title: title.value,
+      await http.put(`/novels/chapters/${existingId}`, {
+        title: chapterTitle.value,
         body: content.value,
-        chapter: encoded,
-        changeSummary: `编辑${SectionTypeLabel[sectionType.value]}章节`,
       })
     } else {
-      await http.post('/articles', {
-        type: 'NOVEL',
-        title: title.value,
-        body: content.value,
-        chapter: encoded,
-      })
+      await http.post(`/novels/${novelConfigId.value}/chapters`, chapterData)
     }
-    await loadNovelChapters(title.value)
+    await loadNovelChapters(novelConfigId.value)
     message.value = '保存成功'
 
     // Advance to next chapter
@@ -457,7 +561,10 @@ function onVolumeChange() {
 }
 
 function onChapterChange() {
-  // If selecting an existing chapter, load its content
+  loadExistingChapterContent()
+}
+
+function loadExistingChapterContent() {
   const existing = novelChapters.value.find(
     (c) =>
       c.section === sectionType.value &&
@@ -579,6 +686,24 @@ const textareaStyle = computed(() => ({
             </div>
           </div>
 
+          <div class="form-group">
+            <label class="field-label">简介</label>
+            <textarea
+              v-model="novelDescription"
+              class="form-input desc-input"
+              placeholder="给你的小说写个简介..."
+              rows="4"
+            ></textarea>
+          </div>
+
+          <div class="form-group">
+            <label class="field-label">绑定世界（可选）</label>
+            <select v-model.number="novelBindWorldId" class="form-select">
+              <option :value="null">不绑定</option>
+              <option v-for="w in accessibleWorlds" :key="w.id" :value="w.id">{{ w.name }}</option>
+            </select>
+          </div>
+
           <div class="create-action">
             <button class="btn-create-book" @click="createNovelBook" :disabled="isSubmitting || !title.trim()">
               {{ isSubmitting ? '创建中...' : '创建这本书' }}
@@ -631,6 +756,23 @@ const textareaStyle = computed(() => ({
                   class="form-input"
                   placeholder="可自行修改章节标题"
                 />
+              </div>
+
+              <div class="chapter-nav-row">
+                <button
+                  class="nav-btn"
+                  :disabled="!hasPrevChapter"
+                  @click="goToPrevChapter"
+                >
+                  ← 上一章
+                </button>
+                <button
+                  class="nav-btn"
+                  :disabled="!hasNextChapter"
+                  @click="goToNextChapter"
+                >
+                  下一章 →
+                </button>
               </div>
             </div>
 
@@ -1261,6 +1403,10 @@ const textareaStyle = computed(() => ({
 .novel-col-left .selector-row, .novel-col-left .chapter-title-field { margin-bottom: 14px; }
 .novel-col-left .field-label { display: block; font-size: 13px; font-weight: 500; color: #5f6368; margin-bottom: 6px; }
 .novel-col-left .form-select { width: 100%; padding: 8px 12px; border: 1px solid #dadce0; border-radius: 8px; font-size: 14px; outline: none; }
+.chapter-nav-row { display: flex; gap: 10px; margin-top: 8px; }
+.chapter-nav-row .nav-btn { flex: 1; padding: 8px 0; background: #f8f9fa; border: 1px solid #dadce0; border-radius: 8px; cursor: pointer; font-size: 13px; color: #1a73e8; transition: background 0.2s; }
+.chapter-nav-row .nav-btn:hover:not(:disabled) { background: #e8f0fe; }
+.chapter-nav-row .nav-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
 .bound-world-card { background: #f8f9fa; border-radius: 12px; padding: 20px; border: 1px solid #e8eaed; }
 .bound-world-card h4 { margin: 0 0 12px 0; font-size: 15px; color: #202124; }

@@ -9,17 +9,62 @@ const router = useRouter()
 const articles = ref<Article[]>([])
 const isLoading = ref(false)
 
-const libraryArticles = computed(() =>
-  articles.value.filter(
-    (a) => ['ESSAY', 'NOVEL'].includes(a.type),
-  ),
-)
+interface BookItem {
+  id: string
+  type: string
+  title: string
+  entryId: number
+  wordCount: number
+  chapterCount?: number
+  description?: string
+  createdAt: string
+  updatedAt?: string
+  navigateTo: string
+}
+
+const libraryArticles = ref<BookItem[]>([])
 
 async function loadArticles() {
   isLoading.value = true
   try {
-    const res = await http.get('/articles', { params: { type: 'ESSAY,NOVEL' } })
-    articles.value = (res.data || []) as Article[]
+    const [articleRes, novelRes] = await Promise.all([
+      http.get('/articles', { params: { type: 'ESSAY' } }),
+      http.get('/novels').catch(() => ({ data: [] })),
+    ])
+    const essayList = (articleRes.data || []) as Article[]
+    const novelList = (novelRes.data || []) as any[]
+
+    const items: BookItem[] = []
+
+    for (const a of essayList) {
+      items.push({
+        id: `essay:${a.id}`,
+        type: a.type,
+        title: a.title,
+        entryId: a.id,
+        wordCount: a.wordCount || 0,
+        createdAt: a.createdAt,
+        navigateTo: `/writing/${a.id}`,
+      })
+    }
+
+    for (const n of novelList) {
+      items.push({
+        id: `novel:${n.id}`,
+        type: 'NOVEL',
+        title: n.title,
+        entryId: n.id,
+        wordCount: n.totalWordCount || 0,
+        chapterCount: n.chapterCount,
+        description: n.description,
+        createdAt: n.createdAt,
+        updatedAt: n.updatedAt,
+        navigateTo: `/writing/${n.id}?novelId=${n.id}`,
+      })
+    }
+
+    items.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    libraryArticles.value = items
   } catch {
     // silent
   } finally {
@@ -27,8 +72,8 @@ async function loadArticles() {
   }
 }
 
-function goToArticle(id: number) {
-  router.push(`/writing/${id}`)
+function goToArticle(item: BookItem) {
+  router.push(item.navigateTo)
 }
 
 function goBack() {
@@ -65,22 +110,26 @@ onMounted(loadArticles)
 
     <div v-else class="article-list">
       <div
-        v-for="article in libraryArticles"
-        :key="article.id"
+        v-for="item in libraryArticles"
+        :key="item.id"
         class="article-row"
-        @click="goToArticle(article.id)"
+        @click="goToArticle(item)"
       >
         <div class="row-main">
-          <h3 class="row-title">{{ article.title }}</h3>
+          <h3 class="row-title">{{ item.title }}</h3>
           <div class="row-meta">
-            <span :class="typeBadgeClass(article.type as ArticleType)">
-              {{ ArticleTypeLabel[article.type as ArticleType] || article.type }}
+            <span :class="typeBadgeClass(item.type as ArticleType)">
+              {{ ArticleTypeLabel[item.type as ArticleType] || item.type }}
             </span>
-            <span class="row-date">{{ new Date(article.createdAt).toLocaleDateString('zh-CN') }}</span>
+            <span v-if="item.chapterCount" class="row-chapters">{{ item.chapterCount }} 章</span>
+            <span class="row-date">{{ new Date(item.createdAt).toLocaleDateString('zh-CN') }}</span>
+            <span v-if="item.updatedAt && item.updatedAt !== item.createdAt" class="row-date">
+              更新于 {{ new Date(item.updatedAt).toLocaleDateString('zh-CN') }}
+            </span>
           </div>
         </div>
         <div class="row-words">
-          <span class="words-num">{{ article.wordCount || 0 }}</span>
+          <span class="words-num">{{ item.wordCount || 0 }}</span>
           <span class="words-label">字</span>
         </div>
         <div class="row-arrow">
