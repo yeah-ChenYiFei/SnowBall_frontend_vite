@@ -13,7 +13,20 @@
       "PowerShell(Set-Location \"E:\\\\python_project\\\\uCloud_GetInformation\"; Select-String -Path \"data\\\\yunyou_page.html\" -Pattern \"待办|作业|活动\" -AllMatches | ForEach-Object { $_.Line.Substring\\(0, [Math]::Min\\(200, $_.Line.Length\\)\\) })",
       "PowerShell(Set-Location \"E:\\\\python_project\\\\uCloud_GetInformation\"; Select-String -Path \"data\\\\homework_detail.html\" -Pattern \"课程|课堂|课\" -AllMatches | ForEach-Object { $_.Line.Substring\\(0, [Math]::Min\\(200, $_.Line.Length\\)\\) })",
       "PowerShell(Select-String -Path \"E:\\\\python_project\\\\uCloud_GetInformation\\\\data\\\\homework_detail.html\" -Pattern \"course|课程|class\" -AllMatches | ForEach-Object { $_.Line.Substring\\(0, [Math]::Min\\(120, $_.Line.Length\\)\\) })",
-      "PowerShell(Set-Location \"E:\\\\python_project\\\\uCloud_GetInformation\"; if \\(Test-Path result.txt\\) { Get-Content result.txt | Select-Object -First 5; Write-Host \"---\"; Write-Host \"Total lines: $\\(\\(Get-Content result.txt | Measure-Object -Line\\).Lines\\)\" } else { Write-Host \"No result.txt yet\" })"
+      "PowerShell(Set-Location \"E:\\\\python_project\\\\uCloud_GetInformation\"; if \\(Test-Path result.txt\\) { Get-Content result.txt | Select-Object -First 5; Write-Host \"---\"; Write-Host \"Total lines: $\\(\\(Get-Content result.txt | Measure-Object -Line\\).Lines\\)\" } else { Write-Host \"No result.txt yet\" })",
+      "PowerShell(pip install *)",
+      "PowerShell(git *)",
+      "PowerShell(try { $r = Invoke-RestMethod -Uri \"http://127.0.0.1:3000/get_login_info\" -Method Post -TimeoutSec 3; $r | ConvertTo-Json -Compress } catch { \"HTTP 3000 不可用: $_\" })",
+      "PowerShell(try { $tcp = New-Object System.Net.Sockets.TcpClient; $tcp.Connect\\(\"127.0.0.1\", 3001\\); \"端口3001 已监听\"; $tcp.Close\\(\\) } catch { \"端口3001 不可用: $_\" })",
+      "PowerShell(python -c \"import websocket; print\\('websocket-client OK'\\)\" 2>&1; python -c \"import requests, lxml, selenium; print\\('core deps OK'\\)\" 2>&1)",
+      "PowerShell(python E:\\\\python_project\\\\uCloud_GetInformation\\\\src\\\\ucloud_monitor.py)",
+      "PowerShell(python -m py_compile E:\\\\python_project\\\\uCloud_GetInformation\\\\src\\\\utils.py 2>&1; python -m py_compile E:\\\\python_project\\\\uCloud_GetInformation\\\\src\\\\deadline_checker.py 2>&1; python -m py_compile E:\\\\python_project\\\\uCloud_GetInformation\\\\src\\\\qq_listener.py 2>&1; python -m py_compile E:\\\\python_project\\\\uCloud_GetInformation\\\\src\\\\sign_monitor.py 2>&1; if \\($?\\) { \"全部通过\" })",
+      "PowerShell(Get-Process *)",
+      "PowerShell(python -u E:\\\\python_project\\\\uCloud_GetInformation\\\\src\\\\qq_listener.py 2>&1)",
+      "PowerShell(Get-Process *Melancholic)",
+      "PowerShell(Stop-Process *)",
+      "PowerShell(Get-WmiObject *)",
+      "PowerShell(Set-Location E:\\\\python_project\\\\uCloud_GetInformation; $output = & python -m ucloud.cli.listener 2>&1; $output; \"EXIT CODE: $LASTEXITCODE\")"
     ]
   }
 }
