@@ -76,6 +76,20 @@ function goToArticle(item: BookItem) {
   router.push(item.navigateTo)
 }
 
+async function deleteArticle(item: BookItem) {
+  if (!confirm(`确定要删除「${item.title}」吗？此操作不可恢复。`)) return
+  try {
+    if (item.type === 'NOVEL') {
+      await http.delete(`/novels/${item.entryId}`)
+    } else {
+      await http.delete(`/articles/${item.entryId}`)
+    }
+    libraryArticles.value = libraryArticles.value.filter(a => a.id !== item.id)
+  } catch (e: any) {
+    alert(e.message || '删除失败')
+  }
+}
+
 function goBack() {
   router.push('/writing')
 }
@@ -132,6 +146,12 @@ onMounted(loadArticles)
           <span class="words-num">{{ item.wordCount || 0 }}</span>
           <span class="words-label">字</span>
         </div>
+        <button class="row-delete" @click.stop="deleteArticle(item)" title="删除">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#d93025" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="3 6 5 6 21 6" />
+            <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
+          </svg>
+        </button>
         <div class="row-arrow">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#bdc1c6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <polyline points="9 18 15 12 9 6" />
@@ -259,6 +279,14 @@ onMounted(loadArticles)
   font-size: 13px;
   color: #999;
 }
+
+.row-delete {
+  background: none; border: none; cursor: pointer;
+  padding: 6px; border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.15s; flex-shrink: 0;
+}
+.row-delete:hover { background: #fce8e6; }
 
 .row-words {
   display: flex;

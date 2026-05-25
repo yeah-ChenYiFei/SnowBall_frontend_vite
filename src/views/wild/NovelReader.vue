@@ -23,8 +23,6 @@ const commentMode = ref<'chapter' | 'book' | null>(null)
 
 const colorTheme = ref<'light' | 'dark' | 'sepia'>(localStorage.getItem('reader_theme') as any || 'light')
 const fontSize = ref(Number(localStorage.getItem('reader_fontSize') || '16'))
-const readProgress = ref(0)
-
 const comments = ref<GenericComment[]>([])
 const newComment = ref('')
 const isLoadingComments = ref(false)
@@ -37,10 +35,48 @@ const currentChapter = computed(() => chapters.value[currentChapterIndex.value] 
 const hasPrevChapter = computed(() => currentChapterIndex.value > 0)
 const hasNextChapter = computed(() => currentChapterIndex.value < chapters.value.length - 1)
 
+// Total content length for progress calculation
+const totalCharCount = computed(() => {
+  let total = 0
+  for (const ch of chapters.value) total += (ch.body || '').length
+  return total
+})
+
+// Current reading position (sum of previous chapters + scroll offset in current)
+const currentReadingPos = ref(0)
+
+function updateReadingPosition() {
+  let pos = 0
+  for (let i = 0; i < currentChapterIndex.value; i++) {
+    pos += (chapters.value[i]?.body || '').length
+  }
+  // Estimate current scroll within visible content
+  const el = document.querySelector('.nr-content')
+  if (el) {
+    const totalH = el.scrollHeight - el.clientHeight
+    const scrolled = el.scrollTop
+    const visibleRatio = totalH > 0 ? scrolled / totalH : 0
+    const currentChapterLen = (currentChapter.value?.body || '').length
+    pos += Math.round(visibleRatio * currentChapterLen)
+  }
+  currentReadingPos.value = pos
+}
+
+const progressPercent = computed(() => {
+  if (totalCharCount.value <= 0) return 0
+  return Math.min(100, Math.round((currentReadingPos.value / totalCharCount.value) * 100))
+})
+
 const sectionLabel: Record<string, string> = { main: '正文', preface: '前言', extra: '番外', postscript: '后记' }
 
 const chapterPosition = computed(() => {
   const ch = currentChapter.value
+  if (!ch) return ''
+  return chapterPositionForIdx(currentChapterIndex.value)
+})
+
+function chapterPositionForIdx(idx: number): string {
+  const ch = chapters.value[idx]
   if (!ch) return ''
   const sec = sectionLabel[ch.section] || ch.section
   let pos = sec
@@ -48,7 +84,7 @@ const chapterPosition = computed(() => {
   pos += ` 第${toChineseNum(ch.chapterNumber)}章`
   if (ch.title) pos += ` · ${ch.title}`
   return pos
-})
+}
 
 function toChineseNum(n: number): string {
   const d = ['零','一','二','三','四','五','六','七','八','九']
@@ -81,7 +117,14 @@ async function loadNovel() {
 function goToChapter(index: number) {
   if (index < 0 || index >= chapters.value.length) return
   currentChapterIndex.value = index
-  nextTick(() => { window.scrollTo({ top: 0, behavior: 'smooth' }) })
+  nextTick(() => {
+    // Scroll to the target chapter within concatenated content
+    const el = document.querySelector('.nr-content')
+    const chapterEl = el?.querySelector(`[data-chapter-index="${index}"]`)
+    if (chapterEl && el) {
+      el.scrollTo({ top: (chapterEl as HTMLElement).offsetTop - 20, behavior: 'smooth' })
+    }
+  })
 }
 function goToPrevChapter() { if (hasPrevChapter.value) goToChapter(currentChapterIndex.value - 1) }
 function goToNextChapter() { if (hasNextChapter.value) goToChapter(currentChapterIndex.value + 1) }
@@ -147,19 +190,97 @@ function loadBookmarks() {
 function saveBookmarks() { localStorage.setItem(`novel_reader_bm_${novelId.value}`, JSON.stringify(bookmarks.value)) }
 function addBookmark() {
   const ch = currentChapter.value; if (!ch) return
-  bookmarks.value.push({ id: Date.now().toString(), chapterIndex: currentChapterIndex.value, chapterTitle: ch.title || chapterPosition.value, scrollPercent: readProgress.value, createdAt: new Date().toISOString() })
+  bookmarks.value.push({ id: Date.now().toString(), chapterIndex: currentChapterIndex.value, chapterTitle: ch.title || chapterPosition.value, scrollPercent: progressPercent.value, createdAt: new Date().toISOString() })
   saveBookmarks()
 }
 function removeBookmark(id: string) { bookmarks.value = bookmarks.value.filter(b => b.id !== id); saveBookmarks() }
 function goToBookmark(bm: Bookmark) { goToChapter(bm.chapterIndex); showLeftSidebar.value = false; showBookmarkPanel.value = false }
 
 function onScroll() {
-  const st = window.scrollY; const dh = document.documentElement.scrollHeight - window.innerHeight
-  if (dh > 0) readProgress.value = Math.round((st / dh) * 100)
+  // Determine which chapter is currently in view
+  const el = document.querySelector('.nr-content')
+  if (!el) return
+  const scrollTop = el.scrollTop
+  let cumulative = 0
+  let foundIdx = 0
+  for (let i = 0; i < chapters.value.length; i++) {
+    cumulative += (chapters.value[i]?.body || '').length
+    // Rough heuristic: each char ≈ some pixels
+    const estHeight = cumulative * 0.3  // ~0.3px per char
+    if (scrollTop < estHeight) {
+      foundIdx = i
+      break
+    }
+    foundIdx = i
+  }
+  if (foundIdx !== currentChapterIndex.value) {
+    currentChapterIndex.value = foundIdx
+  }
+  updateReadingPosition()
+}
+
+// Progress bar drag
+function onProgressClick(e: MouseEvent) {
+  const track = e.currentTarget as HTMLElement
+  const rect = track.getBoundingClientRect()
+  const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width))
+  seekToRatio(ratio)
+}
+
+let progressDragActive = false
+function onProgressMouseDown(e: MouseEvent) {
+  progressDragActive = true
+  document.addEventListener('mousemove', onProgressDragMove)
+  document.addEventListener('mouseup', onProgressDragUp)
+  onProgressClick(e)
+}
+
+function onProgressDragMove(e: MouseEvent) {
+  if (!progressDragActive) return
+  const track = document.querySelector('.nr-prog-track') as HTMLElement
+  if (!track) return
+  const rect = track.getBoundingClientRect()
+  const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width))
+  seekToRatio(ratio)
+}
+
+function onProgressDragUp() {
+  progressDragActive = false
+  document.removeEventListener('mousemove', onProgressDragMove)
+  document.removeEventListener('mouseup', onProgressDragUp)
+}
+
+function seekToRatio(ratio: number) {
+  if (totalCharCount.value <= 0) return
+  const targetPos = Math.round(ratio * totalCharCount.value)
+  let cumulative = 0
+  let targetChapterIdx = 0
+  for (let i = 0; i < chapters.value.length; i++) {
+    const len = (chapters.value[i]?.body || '').length
+    if (cumulative + len >= targetPos) {
+      targetChapterIdx = i
+      break
+    }
+    cumulative += len
+    targetChapterIdx = i
+  }
+  currentChapterIndex.value = targetChapterIdx
+  nextTick(() => {
+    const el = document.querySelector('.nr-content')
+    if (el) {
+      const prevChaptersLen = cumulative
+      const currentChapterLen = (chapters.value[targetChapterIdx]?.body || '').length || 1
+      const internalRatio = (targetPos - prevChaptersLen) / currentChapterLen
+      // Scroll to the right position within the concatenated content
+      const targetScroll = el.scrollHeight * internalRatio * 0.75 + cumulative * 0.3
+      el.scrollTop = Math.max(0, targetScroll)
+      updateReadingPosition()
+    }
+  })
 }
 function onKeydown(e: KeyboardEvent) { if (e.key === 'ArrowLeft') goToPrevChapter(); if (e.key === 'ArrowRight') goToNextChapter() }
 
-watch(currentChapterIndex, () => { if (commentMode.value === 'chapter') loadComments(); nextTick(() => { readProgress.value = 0 }) })
+watch(currentChapterIndex, () => { if (commentMode.value === 'chapter') loadComments() })
 watch(colorTheme, (v) => localStorage.setItem('reader_theme', v))
 watch(fontSize, (v) => localStorage.setItem('reader_fontSize', String(v)))
 
@@ -226,16 +347,18 @@ onUnmounted(() => { window.removeEventListener('scroll', onScroll); window.remov
         </div>
 
         <!-- Content -->
-        <div class="nr-content" @click="toggleUI">
-          <div v-if="currentChapter" class="nr-chapter">
-            <h2 class="nr-chapter-title">{{ chapterPosition }}</h2>
-            <div class="nr-chapter-body">
-              <p v-for="(line, i) in (currentChapter.body || '').split('\n')" :key="i">{{ line }}</p>
+        <div class="nr-content" @click="toggleUI" ref="contentEl">
+          <template v-for="(ch, ci) in chapters" :key="ci">
+            <div class="nr-chapter" :data-chapter-index="ci">
+              <h2 class="nr-chapter-title">{{ chapterPositionForIdx(ci) }}</h2>
+              <div class="nr-chapter-body">
+                <p v-for="(line, i) in (ch.body || '').split('\n')" :key="i">{{ line }}</p>
+              </div>
             </div>
-            <div class="nr-chapter-end">
-              <p v-if="hasNextChapter" class="nr-continue-hint">— 向下滚动继续阅读下一章 —</p>
-              <p v-else class="nr-end-hint">— 全书完 —</p>
-            </div>
+            <div v-if="ci < chapters.length - 1" class="nr-chapter-sep">* * *</div>
+          </template>
+          <div class="nr-chapter-end">
+            <p class="nr-end-hint">— 全书完 —</p>
           </div>
         </div>
 
@@ -277,11 +400,11 @@ onUnmounted(() => { window.removeEventListener('scroll', onScroll); window.remov
         <div v-if="showUI" class="nr-bottombar">
           <button class="nr-nav-btn" :disabled="!hasPrevChapter" @click.stop="goToPrevChapter">← 上一章</button>
           <div class="nr-prog-wrap" @click.stop>
-            <div class="nr-prog-track">
-              <div class="nr-prog-fill" :style="{ width: readProgress + '%' }"></div>
-              <div class="nr-prog-thumb" :style="{ left: readProgress + '%' }"></div>
+            <div class="nr-prog-track" @click="onProgressClick" @mousedown.prevent="onProgressMouseDown">
+              <div class="nr-prog-fill" :style="{ width: progressPercent + '%' }"></div>
+              <div class="nr-prog-thumb" :style="{ left: progressPercent + '%' }"></div>
             </div>
-            <span class="nr-prog-text">{{ readProgress }}%</span>
+            <span class="nr-prog-text">{{ progressPercent }}%</span>
           </div>
           <button class="nr-nav-btn" @click.stop="toggleBookComments">💬 书评</button>
           <button class="nr-nav-btn" :disabled="!hasNextChapter" @click.stop="goToNextChapter">下一章 →</button>
@@ -368,6 +491,7 @@ onUnmounted(() => { window.removeEventListener('scroll', onScroll); window.remov
 .nr-chapter-title { font-size: 22px; font-weight: 700; color: #202124; margin: 0 0 24px 0; text-align: center; }
 .nr-chapter-body { font-size: inherit; line-height: 1.8; color: #333; }
 .nr-chapter-body p { margin: 0 0 16px 0; text-indent: 2em; }
+.nr-chapter-sep { text-align: center; margin: 32px 0; font-size: 18px; color: #ccc; letter-spacing: 8px; user-select: none; }
 .nr-chapter-end { text-align: center; margin: 40px 0 20px; padding: 20px 0; }
 .nr-continue-hint { color: #999; font-size: 14px; margin: 0; }
 .nr-end-hint { color: #bbb; font-size: 14px; margin: 0; }

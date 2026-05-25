@@ -281,10 +281,10 @@ const monthLabels = computed(() => {
 
 function dayColor(day: ContributionDay | null): string {
   if (!day || day.count === 0) return '#ffffff'
-  if (day.count <= 2) return '#9be9a8'
-  if (day.count <= 4) return '#40c463'
-  if (day.count <= 7) return '#30a14e'
-  return '#216e39'
+  if (day.count <= 2) return '#c6e0ff'
+  if (day.count <= 4) return '#7ab8f5'
+  if (day.count <= 7) return '#3b8de0'
+  return '#1a5fb8'
 }
 
 function onDayEnter(e: MouseEvent, day: ContributionDay | null) {
@@ -336,26 +336,26 @@ watch(() => route.params.userId, loadProfile)
               <button v-if="isSelf" class="btn-edit-signature" @click="startEditSignature" title="编辑签名">✎</button>
             </template>
             <div v-else class="signature-edit">
-              <input v-model="signatureText" class="signature-input" placeholder="写一句签名..." maxlength="100" @keyup.enter="saveSignature" />
+              <input v-model="signatureText" class="signature-input" placeholder="写一句签名..." maxlength="10" @keyup.enter="saveSignature" />
               <button class="btn-save-sig" @click="saveSignature">保存</button>
               <button class="btn-cancel-sig" @click="cancelEditSignature">取消</button>
             </div>
           </div>
 
           <div class="user-stats">
-            <div class="stat-item">
+            <div class="stat-item" @click="router.push('/')">
               <span class="stat-num">{{ profile.stats.posts }}</span>
               <span class="stat-label">帖子</span>
             </div>
-            <div class="stat-item">
+            <div class="stat-item" @click="router.push('/create/setting')">
               <span class="stat-num">{{ profile.stats.worlds }}</span>
               <span class="stat-label">世界</span>
             </div>
-            <div class="stat-item">
+            <div class="stat-item" @click="router.push('/writing')">
               <span class="stat-num">{{ profile.stats.articles }}</span>
               <span class="stat-label">文章</span>
             </div>
-            <div class="stat-item">
+            <div class="stat-item" @click="router.push('/create/inspiration')">
               <span class="stat-num">{{ profile.stats.inspirations }}</span>
               <span class="stat-label">灵感</span>
             </div>
@@ -458,10 +458,10 @@ watch(() => route.params.userId, loadProfile)
           <div class="contrib-legend">
             <span>少</span>
             <span class="legend-block" style="background:#ffffff;border:1px solid #d0d7de"></span>
-            <span class="legend-block" style="background:#9be9a8"></span>
-            <span class="legend-block" style="background:#40c463"></span>
-            <span class="legend-block" style="background:#30a14e"></span>
-            <span class="legend-block" style="background:#216e39"></span>
+            <span class="legend-block" style="background:#c6e0ff"></span>
+            <span class="legend-block" style="background:#7ab8f5"></span>
+            <span class="legend-block" style="background:#3b8de0"></span>
+            <span class="legend-block" style="background:#1a5fb8"></span>
             <span>多</span>
           </div>
         </section>
@@ -556,12 +556,12 @@ watch(() => route.params.userId, loadProfile)
   margin: 0 auto 16px;
 }
 
-.avatar-wrapper { position: relative; display: inline-block; margin: 0 auto 16px; }
+.avatar-wrapper { position: relative; display: inline-block; margin: 0 auto 16px; width: 88px; height: 88px; }
 .avatar-wrapper.clickable { cursor: pointer; }
 .avatar-overlay {
   position: absolute; inset: 0; border-radius: 50%;
   background: rgba(0,0,0,0); display: flex; align-items: center; justify-content: center;
-  transition: background 0.2s;
+  transition: background 0.2s; width: 100%; height: 100%;
 }
 .avatar-wrapper.clickable:hover .avatar-overlay { background: rgba(0,0,0,0.4); }
 .upload-hint { opacity: 0; font-size: 20px; transition: opacity 0.2s; }
@@ -608,7 +608,12 @@ watch(() => route.params.userId, loadProfile)
   display: flex;
   flex-direction: column;
   align-items: center;
+  cursor: pointer;
+  border-radius: 8px;
+  padding: 4px 0;
+  transition: background 0.15s;
 }
+.stat-item:hover { background: #f1f3f4; }
 
 .stat-num {
   font-size: 22px;

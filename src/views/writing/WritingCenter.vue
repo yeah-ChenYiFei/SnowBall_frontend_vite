@@ -55,11 +55,6 @@ const visibleCards = computed(() => {
   const list = articleList.value
   if (list.length === 0) return []
   const len = list.length
-  const prevIdx = (currentIndex.value - 1 + len) % len
-  const nextIdx = (currentIndex.value + 1) % len
-  const behindIdx = (currentIndex.value - 2 + len) % len
-
-  // Build card list, deduplicate by card id (handles len < 4)
   const seen = new Set<number>()
   const cards: { item: CardItem; position: 'behind' | 'left' | 'center' | 'right' }[] = []
 
@@ -71,10 +66,11 @@ const visibleCards = computed(() => {
     }
   }
 
-  addCard(behindIdx, 'behind')
-  addCard(prevIdx, 'left')
+  // Build layout based on count: center always present, then left, then right, then behind
   addCard(currentIndex.value, 'center')
-  addCard(nextIdx, 'right')
+  if (len >= 2) addCard((currentIndex.value - 1 + len) % len, 'left')
+  if (len >= 3) addCard((currentIndex.value + 1) % len, 'right')
+  if (len >= 4) addCard((currentIndex.value - 2 + len) % len, 'behind')
 
   return cards
 })

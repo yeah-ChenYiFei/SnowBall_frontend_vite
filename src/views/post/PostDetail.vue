@@ -85,17 +85,12 @@ const handleReact = async (type: 'LIKE' | 'DISLIKE') => {
   if (!post.value) return
   try {
     await http.post(`/posts/${post.value.id}/react`, null, { params: { reactionType: type } })
-    if (post.value.currentUserReaction === type) {
-      post.value.currentUserReaction = null
-      if (type === 'LIKE') post.value.likeCount = (post.value.likeCount || 0) - 1
-      else post.value.dislikeCount = (post.value.dislikeCount || 0) - 1
-    } else {
-      if (post.value.currentUserReaction === 'LIKE') post.value.likeCount = (post.value.likeCount || 0) - 1
-      if (post.value.currentUserReaction === 'DISLIKE') post.value.dislikeCount = (post.value.dislikeCount || 0) - 1
-      post.value.currentUserReaction = type
-      if (type === 'LIKE') post.value.likeCount = (post.value.likeCount || 0) + 1
-      else post.value.dislikeCount = (post.value.dislikeCount || 0) + 1
-    }
+    // Re-fetch post to sync accurate counts from backend
+    const res = await http.get(`/posts/${post.value.id}`)
+    const fresh = res.data
+    post.value.likeCount = fresh.likeCount ?? 0
+    post.value.dislikeCount = fresh.dislikeCount ?? 0
+    post.value.currentUserReaction = fresh.currentUserReaction ?? null
   } catch (e: any) {
     alert(e.message || '操作失败')
   }
