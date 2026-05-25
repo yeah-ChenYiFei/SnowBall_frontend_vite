@@ -11,10 +11,13 @@ const route = useRoute()
 const router = useRouter()
 const code = ref('')
 const loading = ref(false)
+const resending = ref(false)
 const errMsg = ref('')
 const success = ref(false)
+const resendMsg = ref('')
 
-const userId = Number(route.query.userId)
+const verificationId = Number(route.query.verificationId)
+const email = (route.query.email as string) || ''
 
 const handleVerify = async () => {
   errMsg.value = ''
@@ -25,13 +28,30 @@ const handleVerify = async () => {
 
   loading.value = true
   try {
-    await http.post(`/auth/verify-email?userId=${userId}`, { code: code.value })
+    await http.post(`/auth/verify-email?verificationId=${verificationId}`, { code: code.value })
     success.value = true
     setTimeout(() => router.push('/login'), 2000)
   } catch (error: any) {
     errMsg.value = error.message || '验证失败，请稍后再试'
   } finally {
     loading.value = false
+  }
+}
+
+const handleResend = async () => {
+  if (!email) {
+    resendMsg.value = '缺少邮箱信息，请返回重新注册'
+    return
+  }
+  resending.value = true
+  resendMsg.value = ''
+  try {
+    await http.post(`/auth/resend-verification?email=${encodeURIComponent(email)}`)
+    resendMsg.value = '验证码已重新发送，请查收邮件'
+  } catch (error: any) {
+    resendMsg.value = error.message || '重发失败'
+  } finally {
+    resending.value = false
   }
 }
 </script>
@@ -50,6 +70,9 @@ const handleVerify = async () => {
         验证成功！即将跳转到登录页...
       </div>
       <div v-else-if="errMsg" class="error-alert">{{ errMsg }}</div>
+      <div v-if="resendMsg" class="resend-msg" :class="{ 'is-error': resendMsg.includes('失败') || resendMsg.includes('缺少') }">
+        {{ resendMsg }}
+      </div>
 
       <form v-if="!success" @submit.prevent="handleVerify" class="login-form">
         <AppInput
@@ -68,6 +91,9 @@ const handleVerify = async () => {
           <template v-if="!loading">验 证</template>
           <template v-else>验证中...</template>
         </AppButton>
+        <button type="button" class="resend-link" :disabled="resending" @click="handleResend">
+          {{ resending ? '发送中...' : '未收到邮件？重新发送' }}
+        </button>
       </form>
 
       <div class="card-footer">
@@ -146,6 +172,25 @@ const handleVerify = async () => {
   border: 1px solid rgba(52, 168, 83, 0.3);
 }
 
+.resend-msg {
+  background: rgba(232, 240, 254, 0.7);
+  backdrop-filter: blur(8px);
+  color: var(--color-primary);
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  font-family: var(--font-serif);
+  font-size: 12px;
+  font-weight: 300;
+  margin-bottom: 16px;
+  border: 1px solid rgba(26, 115, 232, 0.2);
+}
+
+.resend-msg.is-error {
+  background: rgba(252, 232, 230, 0.7);
+  color: var(--color-danger);
+  border: 1px solid rgba(242, 139, 130, 0.3);
+}
+
 .login-form {
   display: flex;
   flex-direction: column;
@@ -156,6 +201,30 @@ const handleVerify = async () => {
   width: 100%;
   margin-top: 8px;
   letter-spacing: 0.2em;
+}
+
+.resend-link {
+  background: none;
+  border: none;
+  color: var(--color-text-muted);
+  font-family: var(--font-serif);
+  font-size: 12px;
+  font-weight: 200;
+  cursor: pointer;
+  text-align: center;
+  padding: 4px 0;
+  transition: color var(--transition-fast);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.resend-link:hover:not(:disabled) {
+  color: var(--color-primary);
+}
+
+.resend-link:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
 }
 
 .card-footer {

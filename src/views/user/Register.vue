@@ -67,8 +67,8 @@ const handleRegister = async () => {
       email: email.value,
       password: password.value
     })
-    const userId = res.data.userId
-    router.push({ path: '/verify-email', query: { userId: String(userId) } })
+    const verificationId = res.data.verificationId
+    router.push({ path: '/verify-email', query: { verificationId: String(verificationId), email: email.value } })
   } catch (error: any) {
     errMsg.value = error.message || '注册失败，请稍后再试'
   } finally {

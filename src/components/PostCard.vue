@@ -18,7 +18,7 @@ const stripBody = (body?: string) => body?.substring(0, 80) || ''
 <template>
   <router-link :to="`/post/${post.id}`" class="post-card" :class="`img-${imagePosition || 'left'}`">
     <div class="card-cover">
-      <img v-if="post.images?.length" :src="post.images[0]" class="cover-img" />
+      <img v-if="post.images?.length" :src="post.images[0] + '?thumb=1'" class="cover-img" loading="lazy" />
       <div v-else class="cover-placeholder">
         <span class="cover-icon">{{ typeLabel[post.type]?.[0] || '?' }}</span>
       </div>
