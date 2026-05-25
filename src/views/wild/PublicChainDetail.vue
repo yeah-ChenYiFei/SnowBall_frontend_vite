@@ -16,6 +16,12 @@ const isLoading = ref(true)
 const newBody = ref('')
 const isSubmitting = ref(false)
 
+// AI continue state
+const showAiPrompt = ref(false)
+const aiPrompt = ref('')
+const aiLoading = ref(false)
+const isAiContent = ref(false)
+
 // Comment drawer state
 const commentSegmentId = ref(0)
 const showComments = ref(false)
@@ -32,13 +38,12 @@ const approvedSegments = computed(() => {
   return chain.value.segments.filter(s => s.status === 'APPROVED')
 })
 
-// Include pending segments only for the initiator or the segment's author
 const visibleSegments = computed(() => {
   if (!chain.value?.segments) return []
   return chain.value.segments.filter(s => {
     if (s.status === 'APPROVED') return true
-    if (isInitiator.value) return true // initiator sees all
-    if (s.userId === userStore.userInfo?.id) return true // author sees own
+    if (isInitiator.value) return true
+    if (s.userId === userStore.userInfo?.id) return true
     return false
   })
 })
@@ -65,9 +70,29 @@ const handleJoin = async () => {
     alert('请先登录')
     return
   }
-  // Scroll to input area
   await nextTick()
   inputRef.value?.scrollIntoView({ behavior: 'smooth' })
+}
+
+const handleAiContinue = async () => {
+  if (!userStore.isLogin()) {
+    alert('请先登录')
+    return
+  }
+  aiLoading.value = true
+  try {
+    const res = await http.post('/ai/chain-continue', {
+      chainId,
+      prompt: aiPrompt.value || undefined,
+    }, { timeout: 120000 })
+    const data = res.data as { continuation: string; model: string; tokensUsed: number }
+    newBody.value = data.continuation
+    isAiContent.value = true
+  } catch (e: any) {
+    alert('AI续写失败: ' + (e.message || '未知错误'))
+  } finally {
+    aiLoading.value = false
+  }
 }
 
 const handleSubmit = async () => {
@@ -84,8 +109,12 @@ const handleSubmit = async () => {
     await http.post(`/chains/public/${chainId}/join`, {
       body: newBody.value.trim(),
       prevSegmentId: lastSegmentId.value,
+      isAi: isAiContent.value,
     })
     newBody.value = ''
+    aiPrompt.value = ''
+    showAiPrompt.value = false
+    isAiContent.value = false
     await loadChain()
   } catch (e: any) {
     alert(e.message || '提交失败')
@@ -106,6 +135,23 @@ const handleReview = async (segmentId: number, status: string) => {
 const openComments = (segmentId: number) => {
   commentSegmentId.value = segmentId
   showComments.value = true
+}
+
+const handleDeleteSegment = async (seg: ChainSegmentFull) => {
+  if (!confirm('确定要删除这一段的续写吗？')) return
+  try {
+    await http.delete(`/chains/segments/${seg.id}`)
+    await loadChain()
+  } catch (e: any) {
+    alert(e.message || '删除失败')
+  }
+}
+
+const canDeleteSegment = (seg: ChainSegmentFull) => {
+  if (!userStore.isLogin()) return false
+  if (seg.userId === userStore.userInfo?.id) return true
+  if (isInitiator.value) return true
+  return false
 }
 
 const formatDate = (iso: string) => new Date(iso).toLocaleDateString('zh-CN')
@@ -172,6 +218,7 @@ onMounted(loadChain)
             <div class="segment-top">
               <span class="seg-index">第 {{ index + 1 }} 段</span>
               <span class="seg-author">👤 {{ seg.username || '匿名' }}</span>
+              <span v-if="seg.isAiGenerated" class="ai-badge">🤖 AI续写</span>
               <span
                 v-if="seg.status === 'PENDING'"
                 class="seg-status pending"
@@ -192,7 +239,6 @@ onMounted(loadChain)
                 💬 评论 {{ seg.commentCount > 0 ? `(${seg.commentCount})` : '' }}
               </button>
 
-              <!-- Initiator review buttons -->
               <template v-if="isInitiator && seg.status === 'PENDING'">
                 <button class="seg-action-btn approve" @click="handleReview(seg.id, 'APPROVED')">
                   ✓ 通过
@@ -201,6 +247,9 @@ onMounted(loadChain)
                   ✕ 拒绝
                 </button>
               </template>
+              <button v-if="canDeleteSegment(seg)" class="seg-action-btn del" @click="handleDeleteSegment(seg)">
+                🗑 删除
+              </button>
             </div>
           </div>
         </div>
@@ -210,19 +259,47 @@ onMounted(loadChain)
       <div v-if="userStore.isLogin()" ref="inputRef" class="write-area">
         <h3>✍️ 续写接龙</h3>
         <p class="write-hint">接着上一个人的内容继续创作...</p>
-        <textarea
-          v-model="newBody"
-          class="write-textarea"
-          rows="6"
-          placeholder="展开你的想象力..."
-        ></textarea>
-        <button
-          class="btn-submit"
-          :disabled="!newBody.trim() || isSubmitting"
-          @click="handleSubmit"
-        >
-          {{ isSubmitting ? '提交中...' : '提交续写' }}
-        </button>
+        <div class="write-layout">
+          <textarea
+            v-model="newBody"
+            class="write-textarea"
+            rows="8"
+            placeholder="展开你的想象力..."
+          ></textarea>
+          <div class="ai-side-panel">
+            <template v-if="!showAiPrompt">
+              <div class="ai-side-placeholder">
+                <p>需要AI帮你续写吗？</p>
+                <button class="btn-ai-side" @click="showAiPrompt = true; isAiContent = false" :disabled="isSubmitting">
+                  🤖 AI 接龙
+                </button>
+              </div>
+            </template>
+            <template v-else>
+              <label class="ai-side-label">AI 续写提示词</label>
+              <textarea
+                v-model="aiPrompt"
+                class="ai-side-textarea"
+                rows="6"
+                placeholder="描述情节走向、人物发展、文风..."
+              ></textarea>
+              <div class="ai-side-actions">
+                <button class="btn-ai-generate-sm" @click="handleAiContinue" :disabled="aiLoading">
+                  {{ aiLoading ? '生成中...' : '生成续写' }}
+                </button>
+                <button class="btn-ai-cancel-sm" @click="showAiPrompt = false; aiPrompt = ''">取消</button>
+              </div>
+            </template>
+          </div>
+        </div>
+        <div class="write-actions">
+          <button v-if="isAiContent" class="btn-submit btn-submit-ai" :disabled="!newBody.trim() || isSubmitting" @click="handleSubmit">
+            {{ isSubmitting ? '提交中...' : '✅ 提交AI续写' }}
+          </button>
+          <button v-else class="btn-submit" :disabled="!newBody.trim() || isSubmitting" @click="handleSubmit">
+            {{ isSubmitting ? '提交中...' : '提交续写' }}
+          </button>
+        </div>
         <p v-if="!isInitiator" class="write-notice">
           ※ 你的续写需要发起人审核通过后才会显示
         </p>
@@ -317,6 +394,7 @@ onMounted(loadChain)
 }
 .seg-index { font-weight: 600; color: #1a73e8; }
 .seg-author { color: #333; font-weight: 500; }
+.ai-badge { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #fff; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
 .seg-time { color: #999; }
 .seg-status { font-size: 11px; padding: 2px 8px; border-radius: 4px; }
 .seg-status.pending { background: #fef7e0; color: #e37400; }
@@ -337,6 +415,8 @@ onMounted(loadChain)
 .seg-action-btn.approve:hover { background: #e6f4ea; }
 .seg-action-btn.reject { color: #c5221f; border-color: #f28b82; }
 .seg-action-btn.reject:hover { background: #fce8e6; }
+.seg-action-btn.del { color: #d93025; border-color: #fce8e6; margin-left: auto; }
+.seg-action-btn.del:hover { background: #fce8e6; }
 
 /* Write Area */
 .write-area {
@@ -345,18 +425,40 @@ onMounted(loadChain)
 }
 .write-area h3 { margin: 0 0 8px 0; color: #202124; font-size: 18px; }
 .write-hint { margin: 0 0 16px 0; font-size: 13px; color: #5f6368; }
+
+.write-layout { display: flex; gap: 16px; margin-bottom: 14px; }
 .write-textarea {
-  width: 100%; border: 1px solid #dadce0; border-radius: 8px; padding: 14px;
+  flex: 1; min-width: 0; border: 1px solid #dadce0; border-radius: 8px; padding: 14px;
   font-size: 15px; line-height: 1.7; resize: vertical; box-sizing: border-box;
-  outline: none; font-family: inherit; margin-bottom: 16px;
+  outline: none; font-family: inherit;
 }
 .write-textarea:focus { border-color: #1a73e8; box-shadow: 0 0 0 3px rgba(26,115,232,0.1); }
+
+.ai-side-panel { width: 200px; flex-shrink: 0; display: flex; flex-direction: column; }
+.ai-side-placeholder { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; background: #f8f9fa; border: 1px dashed #dadce0; border-radius: 8px; padding: 16px; text-align: center; }
+.ai-side-placeholder p { margin: 0; font-size: 13px; color: #5f6368; }
+.btn-ai-side { padding: 8px 16px; background: linear-gradient(135deg, #667eea, #764ba2); color: #fff; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 500; white-space: nowrap; }
+.btn-ai-side:hover:not(:disabled) { opacity: 0.9; }
+.btn-ai-side:disabled { opacity: 0.5; cursor: not-allowed; }
+.ai-side-label { font-size: 12px; font-weight: 500; color: #5b3e96; margin-bottom: 6px; }
+.ai-side-textarea { width: 100%; flex: 1; border: 1px solid #d4bff9; border-radius: 6px; padding: 8px 10px; font-size: 13px; resize: none; box-sizing: border-box; outline: none; font-family: inherit; background: #faf8ff; min-height: 120px; }
+.ai-side-textarea:focus { border-color: #7c3aed; }
+.ai-side-textarea::placeholder { color: #bdc1c6; font-size: 12px; }
+.ai-side-actions { display: flex; gap: 6px; margin-top: 8px; }
+.btn-ai-generate-sm { flex: 1; padding: 6px 0; background: linear-gradient(135deg, #667eea, #764ba2); color: #fff; border: none; border-radius: 5px; cursor: pointer; font-size: 12px; font-weight: 500; white-space: nowrap; }
+.btn-ai-generate-sm:hover:not(:disabled) { opacity: 0.9; }
+.btn-ai-generate-sm:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-ai-cancel-sm { padding: 6px 10px; background: #fff; color: #5f6368; border: 1px solid #dadce0; border-radius: 5px; cursor: pointer; font-size: 12px; white-space: nowrap; }
+
+.write-actions { display: flex; justify-content: flex-end; gap: 10px; }
 .btn-submit {
   padding: 10px 32px; background: #1a73e8; color: white;
   border: none; border-radius: 8px; font-size: 15px; cursor: pointer; font-weight: 500;
 }
 .btn-submit:hover:not(:disabled) { background: #1557b0; }
 .btn-submit:disabled { background: #a8c7fa; cursor: not-allowed; }
+.btn-submit-ai { background: linear-gradient(135deg, #059669, #10b981); }
+.btn-submit-ai:hover:not(:disabled) { opacity: 0.9; }
 .write-notice { font-size: 12px; color: #999; margin-top: 10px; }
 .write-login-hint { text-align: center; padding: 20px; color: #999; background: #fff; border-radius: 8px; }
 .write-login-hint a { color: #1a73e8; }
@@ -365,5 +467,7 @@ onMounted(loadChain)
   .chain-detail-page { padding: 16px; }
   .header-top { flex-direction: column; }
   .btn-join { width: 100%; }
+  .write-layout { flex-direction: column; }
+  .ai-side-panel { width: 100%; }
 }
 </style>

@@ -71,6 +71,7 @@ const fontFamily = ref('default')
 // AI continuation
 const aiOutput = ref('')
 const aiLoading = ref(false)
+const aiPrompt = ref('')
 
 async function handleAiContinue() {
   if (!novelConfigId.value) {
@@ -80,10 +81,12 @@ async function handleAiContinue() {
   aiLoading.value = true
   aiOutput.value = ''
   try {
-    const res = await http.post('/ai/continue', {
+    const payload: any = {
       novelId: novelConfigId.value,
       currentBody: content.value,
-    }, { timeout: 120000 })
+    }
+    if (aiPrompt.value.trim()) payload.prompt = aiPrompt.value.trim()
+    const res = await http.post('/ai/continue', payload, { timeout: 120000 })
     const data = res.data as { continuation: string; model: string; tokensUsed: number }
     aiOutput.value = data.continuation
   } catch (e: any) {
@@ -93,7 +96,29 @@ async function handleAiContinue() {
   }
 }
 
+function copyAiToNextChapter() {
+  if (!aiOutput.value) return
+  content.value = content.value
+    ? content.value + '\n\n' + aiOutput.value
+    : aiOutput.value
+  aiOutput.value = ''
+  aiPrompt.value = ''
+  message.value = '✅ AI内容已追加到当前章节末尾'
+  setTimeout(() => { message.value = '' }, 2000)
+}
+
 const wordCount = computed(() => content.value.length)
+
+// Novel title inline editing
+const novelTitleSaved = ref(false)
+async function handleUpdateNovelTitle() {
+  if (!novelConfigId.value || !title.value.trim()) return
+  try {
+    await http.put(`/novels/${novelConfigId.value}`, { title: title.value.trim() })
+    novelTitleSaved.value = true
+    setTimeout(() => { novelTitleSaved.value = false }, 2000)
+  } catch (e: any) { /* silent */ }
+}
 
 // Publish + bind world
 const isPublished = ref(false)
@@ -733,6 +758,18 @@ const textareaStyle = computed(() => ({
 
         <!-- Phase 2: Write chapters -->
         <div v-else class="novel-write">
+          <!-- Editable novel title -->
+          <div class="novel-title-edit-row">
+            <input
+              v-model="title"
+              type="text"
+              class="form-input novel-title-input"
+              placeholder="小说书名"
+              @blur="handleUpdateNovelTitle"
+            />
+            <span v-if="novelTitleSaved" class="novel-title-saved">已保存</span>
+          </div>
+
           <!-- Section type tabs -->
           <div class="section-tabs">
             <button
@@ -862,18 +899,35 @@ const textareaStyle = computed(() => ({
             </div>
             <div class="ai-panel">
               <div class="ai-panel-header">🤖 AI 续写</div>
+              <div class="ai-prompt-area">
+                <textarea
+                  v-model="aiPrompt"
+                  class="ai-prompt-input"
+                  rows="2"
+                  placeholder="提示词（可选，描述想要的情节方向、风格等）..."
+                ></textarea>
+              </div>
               <div class="ai-output" :class="{ loading: aiLoading }">
                 <span v-if="aiLoading" class="ai-loading-text">AI 正在续写中...</span>
                 <span v-else-if="!aiOutput" class="ai-placeholder">点击下方按钮，AI 将根据绑定的世界设定和已有小说内容进行续写</span>
                 <span v-else>{{ aiOutput }}</span>
               </div>
-              <button
-                class="ai-continue-btn"
-                :disabled="aiLoading"
-                @click="handleAiContinue"
-              >
-                {{ aiLoading ? '续写中...' : 'AI 续写' }}
-              </button>
+              <div class="ai-panel-btns">
+                <button
+                  class="ai-continue-btn"
+                  :disabled="aiLoading"
+                  @click="handleAiContinue"
+                >
+                  {{ aiLoading ? '续写中...' : 'AI 续写' }}
+                </button>
+                <button
+                  v-if="aiOutput && !aiLoading"
+                  class="ai-copy-btn"
+                  @click="copyAiToNextChapter"
+                >
+                  📋 追加到章节
+                </button>
+              </div>
             </div>
           </div>
 
@@ -1365,6 +1419,10 @@ const textareaStyle = computed(() => ({
   /* no extra wrapper styling needed */
 }
 
+.novel-title-edit-row { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; }
+.novel-title-input { font-size: 18px; font-weight: 700; max-width: 400px; }
+.novel-title-saved { font-size: 12px; color: #137333; white-space: nowrap; }
+
 .section-tabs {
   display: flex;
   gap: 8px;
@@ -1514,9 +1572,13 @@ const textareaStyle = computed(() => ({
   font-size: 13px;
 }
 
+.ai-prompt-area { padding: 8px 12px 0; }
+.ai-prompt-input { width: 100%; border: 1px solid #e8eaed; border-radius: 6px; padding: 8px 10px; font-size: 12px; resize: none; outline: none; box-sizing: border-box; font-family: inherit; background: #fff; }
+.ai-prompt-input:focus { border-color: #1a73e8; }
+.ai-prompt-input::placeholder { color: #bdc1c6; }
+.ai-panel-btns { display: flex; gap: 8px; padding: 0 12px 12px; }
 .ai-continue-btn {
-  margin: 0 12px 12px;
-  padding: 10px 0;
+  flex: 1; padding: 10px 0;
   background: linear-gradient(135deg, #1a73e8 0%, #4285f4 100%);
   color: #fff;
   border: none;
@@ -1527,6 +1589,19 @@ const textareaStyle = computed(() => ({
   transition: all 0.25s;
   box-shadow: 0 2px 8px rgba(26, 115, 232, 0.2);
 }
+.ai-copy-btn {
+  padding: 10px 14px;
+  background: #fff;
+  color: #059669;
+  border: 1px solid #6ee7b7;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s;
+}
+.ai-copy-btn:hover { background: #ecfdf5; border-color: #059669; }
 
 .ai-continue-btn:hover:not(:disabled) {
   transform: translateY(-1px);

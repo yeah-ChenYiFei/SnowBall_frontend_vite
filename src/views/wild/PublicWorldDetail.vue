@@ -3,7 +3,7 @@ import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import http from '@/api/http'
 import { useUserStore } from '@/stores/user'
-import type { World as WorldVO, WorldEntry, ArticleFull, GenericComment } from '@/types'
+import type { World as WorldVO, WorldEntry, WorldRelation, ArticleFull, GenericComment } from '@/types'
 
 const route = useRoute()
 const router = useRouter()
@@ -14,6 +14,12 @@ const world = ref<WorldVO | null>(null)
 const entries = ref<WorldEntry[]>([])
 const boundArticles = ref<ArticleFull[]>([])
 const isLoading = ref(true)
+
+// Entry detail expansion
+const selectedEntry = ref<WorldEntry | null>(null)
+const relations = ref<WorldRelation[]>([])
+const entryRelations = ref<WorldRelation[]>([])
+
 
 // Join request
 const showJoinModal = ref(false)
@@ -41,8 +47,28 @@ const loadAll = async () => {
     world.value = wRes.data
     entries.value = eRes as WorldEntry[]
     boundArticles.value = aRes
+    loadRelations()
   } catch { /* */ }
   finally { isLoading.value = false }
+}
+
+const loadRelations = async () => {
+  try {
+    const res = await http.get(`/worlds/${worldId}/relations`)
+    relations.value = (res.data || []) as WorldRelation[]
+  } catch { relations.value = [] }
+}
+
+const selectEntry = (e: WorldEntry) => {
+  if (selectedEntry.value?.id === e.id) {
+    selectedEntry.value = null
+    entryRelations.value = []
+  } else {
+    selectedEntry.value = e
+    entryRelations.value = relations.value.filter(
+      r => r.fromEntryId === e.id || r.toEntryId === e.id
+    )
+  }
 }
 
 const loadComments = async () => {
@@ -168,12 +194,40 @@ onMounted(() => { loadAll(); loadComments() })
         <h3>世界条目</h3>
         <div v-if="entries.length === 0" class="empty-hint">暂无条目</div>
         <div v-else class="entries-grid">
-          <div v-for="e in entries" :key="e.id" class="entry-card">
+          <div
+            v-for="e in entries"
+            :key="e.id"
+            :class="['entry-card', { 'entry-expanded': selectedEntry?.id === e.id }]"
+            @click="selectEntry(e)"
+          >
             <div class="entry-top">
               <span class="entry-type">{{ e.type }}</span>
+              <span class="entry-expand-icon">{{ selectedEntry?.id === e.id ? '▲' : '▼' }}</span>
             </div>
             <h4 class="entry-name">{{ e.name }}</h4>
-            <p class="entry-preview">{{ (e.contentPreview || e.content || '').substring(0, 100) }}</p>
+            <p class="entry-preview">{{ (e.contentPreview || e.content || '').substring(0, selectedEntry?.id === e.id ? undefined : 100) }}</p>
+
+            <!-- Expanded detail -->
+            <div v-if="selectedEntry?.id === e.id" class="entry-detail" @click.stop>
+              <div class="entry-full-content">
+                <h5>详细介绍</h5>
+                <div class="entry-content-body">
+                  <p v-for="(line, i) in (e.content || '').split('\n')" :key="i">{{ line }}</p>
+                </div>
+              </div>
+
+              <!-- Relations -->
+              <div v-if="entryRelations.length > 0" class="entry-relations">
+                <h5>🔗 关系网络</h5>
+                <div v-for="r in entryRelations" :key="r.id" class="relation-row">
+                  <span class="rel-from">{{ r.fromEntryName }}</span>
+                  <span class="rel-arrow">{{ r.direction === 'BIDIRECTIONAL' ? '⟷' : '⟶' }}</span>
+                  <span class="rel-to">{{ r.toEntryName }}</span>
+                  <span v-if="r.description" class="rel-desc">{{ r.description }}</span>
+                </div>
+              </div>
+
+            </div>
           </div>
         </div>
       </section>
@@ -271,10 +325,25 @@ onMounted(() => { loadAll(); loadComments() })
 .entries-section { background: #fff; border-radius: 14px; padding: 24px; box-shadow: 0 1px 4px rgba(0,0,0,0.05); border: 1px solid #f1f3f4; margin-bottom: 24px; }
 .entries-section h3 { margin: 0 0 16px 0; font-size: 16px; }
 .entries-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
-.entry-card { padding: 16px; border: 1px solid #e8eaed; border-radius: 10px; }
+.entry-card { padding: 16px; border: 1px solid #e8eaed; border-radius: 10px; cursor: pointer; transition: all 0.2s; }
+.entry-card:hover { border-color: #d2e3fc; box-shadow: 0 2px 8px rgba(26,115,232,0.08); }
+.entry-card.entry-expanded { border-color: #1a73e8; box-shadow: 0 4px 16px rgba(26,115,232,0.12); }
+.entry-top { display: flex; justify-content: space-between; align-items: center; }
 .entry-type { font-size: 11px; padding: 2px 8px; background: #f1f3f4; color: #5f6368; border-radius: 4px; }
+.entry-expand-icon { font-size: 10px; color: #999; }
 .entry-name { font-size: 15px; font-weight: 600; color: #202124; margin: 8px 0 4px; }
-.entry-preview { font-size: 12px; color: #999; margin: 0; }
+.entry-preview { font-size: 13px; color: #5f6368; margin: 0; line-height: 1.6; }
+.entry-detail { margin-top: 16px; padding-top: 16px; border-top: 1px solid #e8eaed; }
+.entry-full-content { margin-bottom: 16px; }
+.entry-full-content h5, .entry-relations h5, .entry-ai-story h5 { font-size: 14px; color: #202124; margin: 0 0 10px 0; }
+.entry-content-body { font-size: 14px; line-height: 1.8; color: #333; }
+.entry-content-body p { margin: 0 0 10px 0; }
+.entry-relations { margin-bottom: 16px; }
+.relation-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; font-size: 13px; border-bottom: 1px solid #f8f9fa; }
+.rel-from { color: #1a73e8; font-weight: 500; }
+.rel-arrow { color: #999; font-size: 14px; }
+.rel-to { color: #137333; font-weight: 500; }
+.rel-desc { color: #999; font-size: 12px; margin-left: auto; }
 .empty-hint { text-align: center; padding: 20px 0; color: #999; font-size: 14px; }
 
 /* Bound articles */

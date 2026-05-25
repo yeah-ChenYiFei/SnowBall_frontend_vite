@@ -29,6 +29,62 @@ const changes = ref<WorldChange[]>([])
 const showChangesPanel = ref(false)
 const boundArticles = ref<ArticleFull[]>([])
 
+// ---- AI 创作故事 ----
+interface AiStory { id: string; content: string; prompt: string; entryNames: string; createdAt: string }
+const aiStoryHistory = ref<AiStory[]>([])
+const showAiStoryModal = ref(false)
+const aiStoryPrompt = ref('')
+const aiStorySelectedIds = ref<number[]>([])
+const aiStoryLoading = ref(false)
+const aiStoryResult = ref('')
+
+function loadAiStoryHistory() {
+  try {
+    const raw = localStorage.getItem(`ai_stories_${worldId}`)
+    aiStoryHistory.value = raw ? JSON.parse(raw) : []
+  } catch { aiStoryHistory.value = [] }
+}
+function saveAiStory(story: AiStory) {
+  aiStoryHistory.value.unshift(story)
+  localStorage.setItem(`ai_stories_${worldId}`, JSON.stringify(aiStoryHistory.value))
+}
+function deleteAiStory(id: string) {
+  aiStoryHistory.value = aiStoryHistory.value.filter(s => s.id !== id)
+  localStorage.setItem(`ai_stories_${worldId}`, JSON.stringify(aiStoryHistory.value))
+}
+function toggleEntrySelection(entryId: number) {
+  const idx = aiStorySelectedIds.value.indexOf(entryId)
+  if (idx >= 0) aiStorySelectedIds.value.splice(idx, 1)
+  else aiStorySelectedIds.value.push(entryId)
+}
+async function handleAiGenerateStory() {
+  aiStoryLoading.value = true
+  aiStoryResult.value = ''
+  try {
+    const res = await http.post('/ai/world-story', {
+      worldId,
+      entryIds: aiStorySelectedIds.value.length > 0 ? aiStorySelectedIds.value : undefined,
+      prompt: aiStoryPrompt.value || undefined,
+    }, { timeout: 120000 })
+    const data = res.data as { continuation: string; model: string; tokensUsed: number }
+    aiStoryResult.value = data.continuation
+    const selectedNames = entries.value
+      .filter(e => aiStorySelectedIds.value.includes(e.id))
+      .map(e => e.name).join('、')
+    saveAiStory({
+      id: Date.now().toString(),
+      content: data.continuation,
+      prompt: aiStoryPrompt.value,
+      entryNames: selectedNames || '全部设定',
+      createdAt: new Date().toISOString(),
+    })
+  } catch (e: any) {
+    alert('AI创作失败: ' + (e.message || '未知错误'))
+  } finally {
+    aiStoryLoading.value = false
+  }
+}
+
 async function loadBoundArticles() {
   try {
     const res = await http.get(`/articles/by-world/${worldId}`)
@@ -449,7 +505,7 @@ function onGraphWheel(e: WheelEvent) {
 // ---- 生命周期 ----
 onMounted(() => {
   loadWorld(); loadEntries(); loadTypes(); loadRelations()
-  loadCollaborators(); loadChanges(); loadBoundArticles()
+  loadCollaborators(); loadChanges(); loadBoundArticles(); loadAiStoryHistory()
 })
 </script>
 
@@ -505,6 +561,26 @@ onMounted(() => {
           <span class="bound-novel-author">{{ a.authorName }}</span>
         </div>
       </div>
+    </div>
+
+    <!-- AI 创作故事 -->
+    <div v-if="isWorldCreator" class="ai-story-section">
+      <div class="ai-story-header">
+        <h3>🤖 AI创作故事</h3>
+        <button class="btn-ai-story" @click="showAiStoryModal = true; aiStoryResult = ''; aiStorySelectedIds = []">✨ 创作新故事</button>
+      </div>
+      <div v-if="aiStoryHistory.length > 0" class="ai-story-list">
+        <div v-for="story in aiStoryHistory.slice(0, 3)" :key="story.id" class="ai-story-item">
+          <div class="ai-story-item-header">
+            <span class="ai-story-model">🤖 AI故事</span>
+            <span class="ai-story-entries">{{ story.entryNames }}</span>
+            <span class="ai-story-time">{{ new Date(story.createdAt).toLocaleString('zh-CN') }}</span>
+            <button class="btn-ai-story-del" @click="deleteAiStory(story.id)">×</button>
+          </div>
+          <div class="ai-story-preview">{{ story.content?.substring(0, 150) }}{{ story.content?.length > 150 ? '...' : '' }}</div>
+        </div>
+      </div>
+      <div v-else class="empty-hint" style="padding:12px 0">暂无AI创作故事</div>
     </div>
 
     <!-- 待审批修改 -->
@@ -944,6 +1020,57 @@ onMounted(() => {
         </div>
       </div>
     </transition>
+
+    <!-- AI 创作故事弹窗 -->
+    <transition name="modal">
+      <div v-if="showAiStoryModal" class="modal-overlay" @click.self="showAiStoryModal = false">
+        <div class="modal-box ai-story-modal">
+          <h2 class="modal-title">🤖 AI创作故事</h2>
+
+          <div v-if="!aiStoryResult">
+            <p class="ai-modal-desc">选择世界中的设定条目，让AI根据它们创作一个故事片段。</p>
+
+            <div class="ai-modal-section">
+              <h4>选择设定条目（可多选，不选则使用全部）</h4>
+              <div class="ai-entry-select-list">
+                <div v-for="entry in entries" :key="entry.id"
+                  :class="['ai-entry-chip', { selected: aiStorySelectedIds.includes(entry.id) }]"
+                  @click="toggleEntrySelection(entry.id)">
+                  <span class="ai-entry-chip-name">{{ entry.name }}</span>
+                  <span class="ai-entry-chip-type">{{ entry.type }}</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="ai-modal-section">
+              <h4>提示词（描述你想要的故事情节、冲突、风格等）</h4>
+              <textarea v-model="aiStoryPrompt" class="ai-modal-textarea" rows="4"
+                placeholder="例如：让世界观中的两个主要角色在一次意外中相遇，引发一场关于力量与责任的冲突..."></textarea>
+            </div>
+
+            <div class="ai-modal-actions">
+              <button class="btn-ai-generate" @click="handleAiGenerateStory" :disabled="aiStoryLoading">
+                {{ aiStoryLoading ? 'AI创作中...' : '✨ 开始创作' }}
+              </button>
+              <button class="btn-ai-cancel" @click="showAiStoryModal = false">取消</button>
+            </div>
+          </div>
+
+          <div v-else class="ai-story-result">
+            <h4>✨ AI创作结果</h4>
+            <div class="ai-result-content">
+              <p v-for="(line, i) in aiStoryResult.split('\n')" :key="i">{{ line }}</p>
+            </div>
+            <div class="ai-modal-actions">
+              <button class="btn-ai-regenerate" @click="handleAiGenerateStory" :disabled="aiStoryLoading">
+                {{ aiStoryLoading ? '创作中...' : '🔄 重新创作' }}
+              </button>
+              <button class="btn-ai-cancel" @click="showAiStoryModal = false">关闭</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </transition>
   </div>
 </template>
 
@@ -1291,4 +1418,43 @@ onMounted(() => {
 .bound-novel-author { font-size: 13px; color: #999; }
 
 @media (max-width: 700px) { .world-bottom-cols { grid-template-columns: 1fr; } }
+
+/* AI Story Section */
+.ai-story-section { background: #fff; border-radius: 12px; padding: 20px 24px; margin-top: 16px; border: 1px solid #e8eaed; }
+.ai-story-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+.ai-story-header h3 { margin: 0; font-size: 16px; color: #202124; }
+.btn-ai-story { padding: 8px 18px; background: linear-gradient(135deg, #667eea, #764ba2); color: #fff; border: none; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 500; }
+.btn-ai-story:hover { opacity: 0.9; }
+.ai-story-list { max-height: 180px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+.ai-story-item { background: #f8f9fa; border-radius: 8px; padding: 12px 14px; border: 1px solid #f1f3f4; }
+.ai-story-item-header { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.ai-story-model { font-size: 11px; background: linear-gradient(135deg, #667eea, #764ba2); color: #fff; padding: 2px 8px; border-radius: 10px; font-weight: 600; }
+.ai-story-entries { font-size: 12px; color: #5f6368; }
+.ai-story-time { font-size: 11px; color: #999; margin-left: auto; }
+.btn-ai-story-del { background: none; border: none; color: #d93025; cursor: pointer; font-size: 16px; padding: 0 4px; flex-shrink: 0; }
+.ai-story-preview { font-size: 13px; color: #333; line-height: 1.5; }
+
+/* AI Story Modal */
+.ai-story-modal { max-width: 600px; width: 90vw; }
+.ai-modal-desc { font-size: 14px; color: #5f6368; margin: 0 0 16px 0; }
+.ai-modal-section { margin-bottom: 18px; }
+.ai-modal-section h4 { font-size: 13px; font-weight: 600; color: #202124; margin: 0 0 8px 0; }
+.ai-entry-select-list { display: flex; flex-wrap: wrap; gap: 6px; max-height: 150px; overflow-y: auto; padding: 4px 0; }
+.ai-entry-chip { display: flex; align-items: center; gap: 4px; padding: 6px 12px; background: #f1f3f4; border: 2px solid #e8eaed; border-radius: 16px; cursor: pointer; font-size: 13px; transition: all 0.15s; }
+.ai-entry-chip:hover { border-color: #667eea; }
+.ai-entry-chip.selected { background: #e8e6ff; border-color: #667eea; color: #5b3e96; }
+.ai-entry-chip-name { font-weight: 500; }
+.ai-entry-chip-type { font-size: 11px; color: #999; }
+.ai-modal-textarea { width: 100%; border: 1px solid #dadce0; border-radius: 8px; padding: 12px; font-size: 14px; resize: vertical; box-sizing: border-box; outline: none; font-family: inherit; }
+.ai-modal-textarea:focus { border-color: #667eea; }
+.ai-modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px; }
+.ai-story-result h4 { font-size: 15px; color: #5b3e96; margin: 0 0 12px 0; }
+.ai-result-content { max-height: 400px; overflow-y: auto; background: #f8f9fa; border-radius: 8px; padding: 16px; font-size: 15px; line-height: 1.8; color: #333; }
+.ai-result-content p { margin: 0 0 12px 0; }
+.btn-ai-regenerate { padding: 10px 20px; background: #fff; color: #667eea; border: 1px solid #667eea; border-radius: 8px; cursor: pointer; font-size: 14px; }
+.btn-ai-regenerate:hover { background: #f0e6ff; }
+.btn-ai-generate { padding: 10px 24px; background: linear-gradient(135deg, #667eea, #764ba2); color: #fff; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 500; }
+.btn-ai-generate:hover:not(:disabled) { opacity: 0.9; }
+.btn-ai-generate:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-ai-cancel { padding: 10px 20px; background: #fff; color: #5f6368; border: 1px solid #dadce0; border-radius: 8px; cursor: pointer; font-size: 14px; }
 </style>

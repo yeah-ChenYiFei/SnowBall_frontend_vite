@@ -434,6 +434,7 @@ export interface ChainSegmentFull {
   prevSegmentId: number | null
   depth: number
   commentCount: number
+  isAiGenerated?: boolean
   createdAt: string
 }
 
