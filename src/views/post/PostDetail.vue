@@ -26,7 +26,14 @@ function onAuthorEnter(e: MouseEvent, userId: number) {
   if (hoverTimer) clearTimeout(hoverTimer)
   hoverUserId.value = userId; hoverEl.value = e.currentTarget as HTMLElement; showHoverMenu.value = true
 }
-function onAuthorLeave() { hoverTimer = setTimeout(() => { showHoverMenu.value = false }, 500) }
+function onAuthorLeave() { scheduleClose() }
+function scheduleClose() {
+  if (hoverTimer) clearTimeout(hoverTimer)
+  hoverTimer = setTimeout(() => { showHoverMenu.value = false }, 300)
+}
+function cancelClose() {
+  if (hoverTimer) { clearTimeout(hoverTimer); hoverTimer = null }
+}
 
 const typeMap: Record<string, string> = {
   OC: '原创角色', SETTING: '世界观', FRAGMENT: '小说片段', BOOK_INFO: '书籍信息',
@@ -219,10 +226,11 @@ onMounted(() => { loadPost() })
       source="POST"
       :trigger-el="hoverEl"
       @close="showHoverMenu = false"
-      @cancelClose="if (hoverTimer) { clearTimeout(hoverTimer); hoverTimer = null }"
+      @scheduleClose="scheduleClose"
+      @cancelClose="cancelClose"
     />
 
-    <div v-else class="error-state">
+    <div v-if="!isLoading && !post" class="error-state">
       <p>帖子不存在或已被删除</p>
       <router-link to="/">返回广场</router-link>
     </div>

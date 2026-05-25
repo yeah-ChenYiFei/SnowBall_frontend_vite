@@ -919,6 +919,7 @@ const textareaStyle = computed(() => ({
             class="writing-textarea"
             :style="textareaStyle"
             placeholder="在这里挥洒您的文采..."
+            maxlength="5000"
           ></textarea>
         </div>
 

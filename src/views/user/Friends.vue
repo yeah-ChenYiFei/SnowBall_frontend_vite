@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, onMounted, onUnmounted, nextTick, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useFriendStore } from '@/stores/friend'
 import { useUserStore } from '@/stores/user'
+import { useChatStore } from '@/stores/chat'
 import http from '@/api/http'
 import UserAvatar from '@/components/UserAvatar.vue'
 import ImageUploadButton from '@/components/ImageUploadButton.vue'
@@ -12,8 +13,10 @@ import type { Friend, PrivateMessage } from '@/types'
 const router = useRouter()
 const friendStore = useFriendStore()
 const userStore = useUserStore()
+const chatStore = useChatStore()
 
 const tab = ref<'friends' | 'pending'>('friends')
+const friendUnreadMap = ref<Record<number, number>>({})
 const selectedFriend = ref<Friend | null>(null)
 const messages = ref<PrivateMessage[]>([])
 const newMsg = ref('')
@@ -27,7 +30,23 @@ let pollTimer: ReturnType<typeof setInterval> | null = null
 function loadFriends() {
   friendStore.loadFriends()
   friendStore.loadPendingRequests()
+  loadFriendUnreadCounts()
 }
+
+async function loadFriendUnreadCounts() {
+  try {
+    await chatStore.loadPartners()
+    const map: Record<number, number> = {}
+    for (const p of chatStore.partners) {
+      map[p.id] = p.unreadCount || 0
+    }
+    friendUnreadMap.value = map
+  } catch { /* silent */ }
+}
+
+const totalFriendUnread = computed(() => {
+  return Object.values(friendUnreadMap.value).reduce((a, b) => a + b, 0)
+})
 
 async function loadMessages(friendId: number) {
   isLoadingMsgs.value = true
@@ -45,6 +64,8 @@ async function loadMessages(friendId: number) {
 
 function selectFriend(f: Friend) {
   selectedFriend.value = f
+  // Clear unread for this friend
+  friendUnreadMap.value[f.userId] = 0
   loadMessages(f.userId)
 }
 
@@ -100,6 +121,8 @@ const formatTime = (iso: string) => {
 onMounted(() => {
   loadFriends()
   pollTimer = setInterval(() => {
+    // Poll unread counts every 5s for real-time badge updates
+    loadFriendUnreadCounts()
     if (selectedFriend.value) {
       loadMessages(selectedFriend.value.userId)
     }
@@ -149,6 +172,7 @@ onUnmounted(() => {
             <span class="friend-name">{{ f.username }}</span>
             <span class="friend-since">好友始于 {{ new Date(f.since).toLocaleDateString('zh-CN') }}</span>
           </div>
+          <span v-if="friendUnreadMap[f.userId] > 0" class="friend-unread-badge">{{ friendUnreadMap[f.userId] > 99 ? '99+' : friendUnreadMap[f.userId] }}</span>
           <button class="btn-profile-sm" @click.stop="goToProfile(f.userId)" title="查看主页">👤</button>
         </div>
       </div>
@@ -215,6 +239,7 @@ onUnmounted(() => {
                 type="text"
                 class="chat-input"
                 placeholder="输入消息..."
+                maxlength="200"
                 @keyup.enter="sendMessage()"
               />
               <ImageUploadButton @uploaded="onImageUploaded" />
@@ -296,6 +321,11 @@ onUnmounted(() => {
 .friend-item-info { flex: 1; min-width: 0; }
 .friend-name { font-size: 14px; color: #202124; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .friend-since { font-size: 12px; color: #999; }
+.friend-unread-badge {
+  background: #ea4335; color: #fff; border-radius: 10px;
+  padding: 2px 7px; font-size: 11px; font-weight: 600;
+  min-width: 18px; text-align: center; flex-shrink: 0;
+}
 .btn-profile-sm {
   background: none; border: 1px solid #dadce0; border-radius: 4px;
   cursor: pointer; font-size: 14px; padding: 4px 8px; flex-shrink: 0;

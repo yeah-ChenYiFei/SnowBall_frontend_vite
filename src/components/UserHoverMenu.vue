@@ -17,6 +17,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'close'): void
   (e: 'cancelClose'): void
+  (e: 'scheduleClose'): void
 }>()
 
 const router = useRouter()
@@ -33,8 +34,6 @@ const rect = props.triggerEl.getBoundingClientRect()
 
 const posX = ref(Math.min(rect.left, window.innerWidth - 260))
 const posY = ref(rect.bottom - 2)
-
-let closeTimer: ReturnType<typeof setTimeout> | null = null
 
 onMounted(async () => {
   const [s, profileRes] = await Promise.all([
@@ -54,7 +53,6 @@ onMounted(async () => {
 
 onUnmounted(() => {
   document.removeEventListener('click', onClickOutside)
-  if (closeTimer) clearTimeout(closeTimer)
 })
 
 function onClickOutside(e: MouseEvent) {
@@ -64,12 +62,11 @@ function onClickOutside(e: MouseEvent) {
 }
 
 function onCardEnter() {
-  if (closeTimer) { clearTimeout(closeTimer); closeTimer = null }
   emit('cancelClose')
 }
 
 function onCardLeave() {
-  closeTimer = setTimeout(() => emit('close'), 500)
+  emit('scheduleClose')
 }
 
 function goToProfile() {
@@ -100,7 +97,15 @@ const formatDate = (iso: string) => new Date(iso).toLocaleDateString('zh-CN')
       @mouseenter="onCardEnter"
       @mouseleave="onCardLeave"
     >
-      <div v-if="!loaded" class="hover-loading">加载中...</div>
+      <div v-if="!loaded" class="hover-loading">
+          <div class="loading-skeleton">
+            <div class="skel-avatar"></div>
+            <div class="skel-lines">
+              <div class="skel-line skel-line-short"></div>
+              <div class="skel-line skel-line-long"></div>
+            </div>
+          </div>
+        </div>
       <template v-else>
         <div class="hover-user-info">
           <UserAvatar :username="username" :avatar-url="avatarUrl" :size="44" class="hover-avatar" />
@@ -148,7 +153,7 @@ const formatDate = (iso: string) => new Date(iso).toLocaleDateString('zh-CN')
 .hover-menu {
   position: fixed;
   z-index: 1001;
-  pointer-events: auto;  /* the card itself captures mouse events */
+  pointer-events: auto;
   background: #fff;
   border: 1px solid #e8eaed;
   border-radius: 14px;
@@ -156,6 +161,19 @@ const formatDate = (iso: string) => new Date(iso).toLocaleDateString('zh-CN')
   min-width: 220px;
   max-width: 260px;
   box-shadow: 0 12px 32px rgba(0,0,0,0.14);
+  transform-origin: top left;
+  animation: hoverMenuIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes hoverMenuIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.85);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 .hover-user-info {
   display: flex;
@@ -212,10 +230,47 @@ const formatDate = (iso: string) => new Date(iso).toLocaleDateString('zh-CN')
 .pending-badge { color: #e37400; background: #fef7e0; }
 
 .hover-loading {
-  text-align: center;
-  color: #999;
-  font-size: 13px;
-  padding: 8px 0;
+  padding: 4px 0;
+}
+
+.loading-skeleton {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid #f1f3f4;
+}
+
+.skel-avatar {
+  width: 44px; height: 44px;
+  border-radius: 50%;
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.2s ease-in-out infinite;
+  flex-shrink: 0;
+}
+
+.skel-lines {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.skel-line {
+  height: 10px;
+  border-radius: 5px;
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.2s ease-in-out infinite;
+}
+
+.skel-line-short { width: 60%; }
+.skel-line-long  { width: 85%; }
+
+@keyframes shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
 }
 
 .hover-posts-section {

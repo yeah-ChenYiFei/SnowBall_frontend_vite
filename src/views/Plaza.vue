@@ -23,8 +23,13 @@ function onAuthorEnter(e: MouseEvent, userId: number) {
   hoverEl.value = e.currentTarget as HTMLElement
   showHoverMenu.value = true
 }
-function onAuthorLeave() {
-  hoverTimer = setTimeout(() => { showHoverMenu.value = false }, 500)
+function onAuthorLeave() { scheduleClose() }
+function scheduleClose() {
+  if (hoverTimer) clearTimeout(hoverTimer)
+  hoverTimer = setTimeout(() => { showHoverMenu.value = false }, 300)
+}
+function cancelClose() {
+  if (hoverTimer) { clearTimeout(hoverTimer); hoverTimer = null }
 }
 
 const posts = ref<Post[]>([])
@@ -222,7 +227,8 @@ watch(sort, () => loadPosts())
       source="POST"
       :trigger-el="hoverEl"
       @close="showHoverMenu = false"
-      @cancelClose="if (hoverTimer) { clearTimeout(hoverTimer); hoverTimer = null }"
+      @scheduleClose="scheduleClose"
+      @cancelClose="cancelClose"
     />
 
     <!-- Create Post Modal -->

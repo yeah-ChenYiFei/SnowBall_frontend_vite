@@ -59,6 +59,10 @@ async function openChat(userId: number) {
     partnerName.value = '用户' + userId
   }
   router.push('/chat/' + userId)
+  // Clear unread count for this partner
+  const partner = chatStore.partners.find(p => p.id === userId)
+  if (partner) partner.unreadCount = 0
+  chatStore.loadUnreadCount()
   await chatStore.startChat(userId)
   isLoading.value = false
 
@@ -171,6 +175,7 @@ function goBack() {
                 class="chat-input"
                 placeholder="输入消息..."
                 rows="2"
+                maxlength="200"
                 @keydown="handleKeydown"
               ></textarea>
               <ImageUploadButton @uploaded="onImageUploaded" />

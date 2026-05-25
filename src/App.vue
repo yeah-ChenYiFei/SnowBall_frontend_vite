@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useUserStore } from './stores/user'
 import { useRouter, useRoute } from 'vue-router'
 import http from '@/api/http'
@@ -40,7 +40,7 @@ onMounted(() => {
       fetchUnreadCount()
       fetchFriendUnread()
     }
-  }, 30000)
+  }, 10000)
 })
 
 onUnmounted(() => {
@@ -85,9 +85,23 @@ function openMyMenu() {
 
 const fetchFriendUnread = async () => {
   if (!userStore.isLogin()) return
-  // Backend endpoint pending — silently set 0 for now
-  friendUnread.value = 0
+  try {
+    // Import chatStore dynamically to avoid circular dependency
+    const { useChatStore } = await import('./stores/chat')
+    const chatStore = useChatStore()
+    await chatStore.loadUnreadCount()
+    friendUnread.value = chatStore.unreadCount
+  } catch {
+    friendUnread.value = 0
+  }
 }
+
+// Clear notification badge when entering notifications page
+watch(() => route.path, (path) => {
+  if (path === '/notifications') {
+    unreadCount.value = 0
+  }
+})
 
 function handleLogout() {
   userStore.logout()
@@ -177,6 +191,7 @@ function handleLogout() {
             @mouseleave="scheduleHideMy"
           >
             我的 ({{ userStore.userInfo?.username || '' }})
+            <span v-if="friendUnread > 0" class="nav-dot-badge"></span>
             <span class="arrow" :class="{ 'arrow-open': showMyMenu }">▾</span>
             <transition name="dropdown">
               <div v-if="showMyMenu" class="dropdown-panel"
@@ -321,6 +336,17 @@ function handleLogout() {
   background: var(--color-primary-light);
 }
 
+.nav-dot-badge {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  width: 10px; height: 10px;
+  background: var(--color-notification);
+  border-radius: 50%;
+  border: 2px solid #fff;
+  z-index: 2;
+}
+
 /* 用户操作按钮 */
 .user-actions {
   display: flex;
@@ -441,6 +467,7 @@ function handleLogout() {
   padding: 10px 18px;
   text-decoration: none;
   transition: background var(--transition-fast);
+  position: relative;
 }
 
 .dropdown-item:hover {

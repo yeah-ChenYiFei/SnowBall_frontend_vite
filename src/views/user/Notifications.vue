@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, onMounted, watch } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import http from '@/api/http'
 import { useFriendStore } from '@/stores/friend'
 import type { Notification } from '@/types'
@@ -10,6 +10,7 @@ const friendStore = useFriendStore()
 const notifications = ref<Notification[]>([])
 const isLoading = ref(false)
 const unreadCount = ref(0)
+const processedIds = ref<Set<number>>(new Set())
 
 const loadNotifications = async () => {
   isLoading.value = true
@@ -59,13 +60,14 @@ const handleClick = (n: Notification) => {
 
 async function handleAcceptFriend(n: Notification) {
   await markRead(n.id)
-  // sourceId is the friendship ID for FRIEND_REQUEST
   await friendStore.acceptRequest(n.sourceId)
+  processedIds.value.add(n.id)
 }
 
 async function handleRejectFriend(n: Notification) {
   await markRead(n.id)
   await friendStore.rejectRequest(n.sourceId)
+  processedIds.value.add(n.id)
 }
 
 const typeLabel = (type: string) => {
@@ -120,9 +122,12 @@ onMounted(() => loadNotifications())
           <span class="notif-type">{{ typeLabel(n.type) }}</span>
           <span class="notif-text">{{ n.body }}</span>
         </div>
-        <div class="notif-actions" v-if="n.type === 'FRIEND_REQUEST'" @click.stop>
+        <div class="notif-actions" v-if="n.type === 'FRIEND_REQUEST' && !processedIds.has(n.id)" @click.stop>
           <button class="btn-notif-accept" @click="handleAcceptFriend(n)">同意</button>
           <button class="btn-notif-reject" @click="handleRejectFriend(n)">拒绝</button>
+        </div>
+        <div class="notif-actions" v-else-if="n.type === 'FRIEND_REQUEST' && processedIds.has(n.id)" @click.stop>
+          <span class="processed-text">您已通过/拒绝</span>
         </div>
         <div class="notif-time">{{ new Date(n.createdAt).toLocaleString() }}</div>
       </div>
@@ -202,4 +207,5 @@ onMounted(() => loadNotifications())
   border: 1px solid #f28b82; border-radius: 4px; cursor: pointer; font-size: 12px;
 }
 .btn-notif-reject:hover { background: #fce8e6; }
+.processed-text { font-size: 12px; color: #999; }
 </style>

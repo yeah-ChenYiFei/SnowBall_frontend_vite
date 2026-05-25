@@ -210,6 +210,7 @@ export interface UserVO {
   avatarUrl?: string
   signature?: string
   createdAt?: string
+  unreadCount?: number
 }
 
 // 7. 世界观 / 设定
