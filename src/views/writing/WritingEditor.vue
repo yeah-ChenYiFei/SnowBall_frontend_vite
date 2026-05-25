@@ -83,7 +83,7 @@ async function handleAiContinue() {
     const res = await http.post('/ai/continue', {
       novelId: novelConfigId.value,
       currentBody: content.value,
-    })
+    }, { timeout: 120000 })
     const data = res.data as { continuation: string; model: string; tokensUsed: number }
     aiOutput.value = data.continuation
   } catch (e: any) {

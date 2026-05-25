@@ -26,7 +26,7 @@ type HttpInstance = AxiosInstance & {
 
 const http = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || '/api/v1',
-  timeout: 10000
+  timeout: 30000
 }) as HttpInstance
 
 http.interceptors.request.use(config => {
