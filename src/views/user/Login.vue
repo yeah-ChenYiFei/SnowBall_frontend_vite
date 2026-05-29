@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useUserStore } from '@/stores/user.ts'
 import SnowBg from '@/components/SnowBg.vue'
@@ -52,13 +52,112 @@ const handleLogin = async () => {
     loading.value = false
   }
 }
+
+// ── Scroll behavior ──
+const scrollContainer = ref<HTMLElement | null>(null)
+const loginSection = ref<HTMLElement | null>(null)
+const hasReachedLogin = ref(false)
+const isTransitioning = ref(false)
+const indicatorOpacity = ref(1)
+const loginVisible = ref(false)
+
+const SNAP_THRESHOLD = 0.12 // 12% of hero height triggers snap
+
+function getLoginTop(): number {
+  const el = scrollContainer.value
+  const loginEl = loginSection.value
+  if (!el || !loginEl) return el?.clientHeight || 0
+  return loginEl.offsetTop
+}
+
+function onScroll() {
+  if (isTransitioning.value) return
+
+  const el = scrollContainer.value
+  if (!el) return
+  const heroH = el.clientHeight
+  const scrollTop = el.scrollTop
+
+  // Fade indicator as user scrolls
+  indicatorOpacity.value = Math.max(0, 1 - scrollTop / (heroH * 0.3))
+
+  // Already locked to login — clamp if user tries to scroll up
+  if (hasReachedLogin.value) {
+    const loginTop = getLoginTop()
+    if (scrollTop < loginTop - 2) {
+      el.scrollTop = loginTop
+    }
+    return
+  }
+
+  // Trigger snap transition
+  if (scrollTop > heroH * SNAP_THRESHOLD) {
+    isTransitioning.value = true
+    const loginTop = getLoginTop()
+    el.scrollTo({ top: loginTop, behavior: 'smooth' })
+
+    setTimeout(() => {
+      hasReachedLogin.value = true
+      isTransitioning.value = false
+      loginVisible.value = true
+    }, 700)
+  }
+}
+
+function onWheel(e: WheelEvent) {
+  if (!hasReachedLogin.value) return
+  const el = scrollContainer.value
+  if (!el) return
+  const loginTop = getLoginTop()
+
+  // Block scroll-up when at login section
+  if (e.deltaY < 0 && el.scrollTop <= loginTop + 5) {
+    e.preventDefault()
+  }
+}
+
+// Touch handling for mobile
+let touchStartY = 0
+function onTouchStart(e: TouchEvent) {
+  touchStartY = e.touches[0].clientY
+}
+function onTouchMove(e: TouchEvent) {
+  if (!hasReachedLogin.value) return
+  const el = scrollContainer.value
+  if (!el) return
+  const loginTop = getLoginTop()
+  const delta = touchStartY - e.touches[0].clientY // positive = scrolling up (finger down)
+
+  if (delta > 0 && el.scrollTop <= loginTop + 5) {
+    e.preventDefault()
+  }
+}
+
+onMounted(() => {
+  const el = scrollContainer.value
+  if (!el) return
+
+  // Wheel lock — must be non-passive to allow preventDefault
+  el.addEventListener('wheel', onWheel, { passive: false })
+  el.addEventListener('touchstart', onTouchStart, { passive: true })
+  el.addEventListener('touchmove', onTouchMove, { passive: false })
+
+  onUnmounted(() => {
+    el.removeEventListener('wheel', onWheel)
+    el.removeEventListener('touchstart', onTouchStart)
+    el.removeEventListener('touchmove', onTouchMove)
+  })
+})
 </script>
 
 <template>
-  <div class="login-fullscreen">
-    <SnowBg />
+  <div class="login-page">
+    <!-- Fixed background layer -->
+    <div class="bg-layer">
+      <SnowBg />
+    </div>
 
-    <!-- Top-left artistic text -->
+    <!-- Fixed top-left artistic text — visible on both hero & login -->
     <div class="artistic-text">
       <div class="art-line" :class="{ visible: showLine }" />
       <Transition name="text-rotate" mode="out-in">
@@ -69,67 +168,91 @@ const handleLogin = async () => {
       </Transition>
     </div>
 
-    <!-- Glass card -->
-    <GlassCard class="login-card">
-      <div class="card-brand">
-        <h1 class="brand-title">雪球</h1>
-        <p class="brand-subtitle">你的OC写作平台</p>
-      </div>
+    <!-- Scrollable content -->
+    <div
+      ref="scrollContainer"
+      class="scroll-container"
+      @scroll="onScroll"
+    >
+      <!-- Hero / landing section -->
+      <section class="hero-section">
+        <!-- Scroll-down indicator: two parallel downward chevrons -->
+        <div class="scroll-indicator" :style="{ opacity: indicatorOpacity }">
+          <div class="chevron"></div>
+          <div class="chevron"></div>
+          <span class="scroll-hint">向下滚动登录</span>
+        </div>
+      </section>
 
-      <form @submit.prevent="handleLogin" class="login-form">
-        <AppInput
-          id="login-username"
-          v-model="username"
-          autocomplete="username"
-          placeholder="用户名"
-          required
-        />
-        <AppInput
-          id="login-password"
-          v-model="password"
-          type="password"
-          autocomplete="current-password"
-          placeholder="密码"
-          required
-        />
-        <AppButton
-          type="submit"
-          :loading="loading"
-          :disabled="loading"
-          class="submit-btn"
-          @click="handleLogin"
-        >
-          <template v-if="!loading">登 录</template>
-          <template v-else>登录中...</template>
-        </AppButton>
-      </form>
+      <!-- Login section -->
+      <section ref="loginSection" class="login-section">
+        <GlassCard class="login-card" :class="{ visible: loginVisible }">
+          <div class="card-brand">
+            <h1 class="brand-title">雪球</h1>
+            <p class="brand-subtitle">你的OC写作平台</p>
+          </div>
 
-      <div class="card-footer">
-        <router-link to="/forgot-password" class="forgot-link">忘记密码？</router-link>
-        <router-link to="/register">还没有账号？<span>立即注册</span></router-link>
-      </div>
-    </GlassCard>
+          <form @submit.prevent="handleLogin" class="login-form">
+            <AppInput
+              id="login-username"
+              v-model="username"
+              autocomplete="username"
+              placeholder="用户名"
+              required
+            />
+            <AppInput
+              id="login-password"
+              v-model="password"
+              type="password"
+              autocomplete="current-password"
+              placeholder="密码"
+              required
+            />
+            <AppButton
+              type="submit"
+              :loading="loading"
+              :disabled="loading"
+              class="submit-btn"
+              @click="handleLogin"
+            >
+              <template v-if="!loading">登 录</template>
+              <template v-else>登录中...</template>
+            </AppButton>
+          </form>
+
+          <div class="card-footer">
+            <router-link to="/forgot-password" class="forgot-link">忘记密码？</router-link>
+            <router-link to="/register">还没有账号？<span>立即注册</span></router-link>
+          </div>
+        </GlassCard>
+      </section>
+    </div>
   </div>
 </template>
 
 <style scoped>
-.login-fullscreen {
+.login-page {
   position: fixed;
   inset: 0;
   background: linear-gradient(135deg, #e8f0fe 0%, #f8f9fa 40%, #eaf1fb 100%);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  overflow: hidden;
   font-family: var(--font-serif);
+  overflow: hidden;
 }
 
-/* ── Artistic text ── */
-.artistic-text {
+/* ── Fixed background layer ── */
+.bg-layer {
   position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* ── Fixed artistic text (always visible) ── */
+.artistic-text {
+  position: fixed;
   top: 40px;
   left: 48px;
-  z-index: 10;
+  z-index: 30;
+  pointer-events: none;
 }
 
 .art-line {
@@ -162,41 +285,118 @@ const handleLogin = async () => {
   margin-top: 4px;
 }
 
-/* Transition: leave (slide right + blur) */
+/* Text rotate transitions */
 .text-rotate-leave-active {
   transition: all 0.5s ease-in;
 }
-
 .text-rotate-leave-to {
   opacity: 0;
   transform: translateX(36px);
   filter: blur(8px);
 }
-
-/* Transition: enter (pop in from left) */
 .text-rotate-enter-active {
   transition: all 0.55s cubic-bezier(0.25, 0.1, 0.25, 1);
 }
-
 .text-rotate-enter-active .art-chinese {
   transition: opacity 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) 0.05s,
               transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) 0.05s;
 }
-
 .text-rotate-enter-active .art-english {
   transition: opacity 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) 0.15s,
               transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) 0.15s;
 }
-
 .text-rotate-enter-from {
   opacity: 0;
   transform: translateX(-48px);
 }
-
 .text-rotate-enter-from .art-chinese,
 .text-rotate-enter-from .art-english {
   opacity: 0;
   transform: translateX(-48px) scale(0.9);
+}
+
+/* ── Scroll container ── */
+.scroll-container {
+  position: absolute;
+  inset: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scroll-behavior: smooth;
+  scroll-snap-type: y mandatory;
+  -webkit-overflow-scrolling: touch;
+}
+
+.scroll-container::-webkit-scrollbar {
+  width: 0;
+}
+
+/* ── Hero section ── */
+.hero-section {
+  position: relative;
+  height: 100vh;
+  scroll-snap-align: start;
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+}
+
+/* ── Scroll-down indicator ── */
+.scroll-indicator {
+  position: absolute;
+  bottom: 12%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  z-index: 10;
+  transition: opacity 0.35s ease;
+}
+
+.chevron {
+  width: 26px;
+  height: 18px;
+  background: rgba(120, 130, 150, 0.4);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  border: 1px solid rgba(140, 150, 170, 0.45);
+  clip-path: polygon(50% 100%, 0% 0%, 100% 0%);
+}
+
+.chevron:nth-child(2) {
+  animation: chevron-pulse 2s ease-in-out infinite;
+}
+.chevron:nth-child(1) {
+  animation: chevron-pulse 2s ease-in-out 0.3s infinite;
+}
+
+@keyframes chevron-pulse {
+  0%, 100% {
+    opacity: 0.5;
+    transform: translateY(0);
+  }
+  50% {
+    opacity: 0.85;
+    transform: translateY(6px);
+  }
+}
+
+.scroll-hint {
+  font-family: var(--font-serif);
+  font-size: 15px;
+  font-weight: 200;
+  color: var(--color-text-secondary);
+  letter-spacing: 0.15em;
+  white-space: nowrap;
+}
+
+/* ── Login section ── */
+.login-section {
+  min-height: 100vh;
+  scroll-snap-align: start;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 40px 20px;
 }
 
 /* ── Login card ── */
@@ -206,6 +406,17 @@ const handleLogin = async () => {
   width: 100%;
   max-width: 400px;
   padding: 48px 44px 36px;
+
+  opacity: 0;
+  transform: translateY(80px);
+  transition:
+    opacity 0.7s cubic-bezier(0.25, 0.1, 0.25, 1) 0.1s,
+    transform 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) 0.1s;
+}
+
+.login-card.visible {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 /* ── Brand ── */
@@ -274,5 +485,34 @@ const handleLogin = async () => {
 .forgot-link {
   display: block;
   margin-bottom: 8px;
+}
+
+/* ── Responsive ── */
+@media (max-width: 480px) {
+  .artistic-text {
+    top: 24px;
+    left: 24px;
+  }
+
+  .art-line.visible {
+    width: 200px;
+  }
+
+  .art-chinese {
+    font-size: 18px;
+  }
+
+  .art-english {
+    font-size: 13px;
+  }
+
+  .login-card {
+    padding: 36px 28px 28px;
+    max-width: 340px;
+  }
+
+  .scroll-indicator {
+    bottom: 15%;
+  }
 }
 </style>

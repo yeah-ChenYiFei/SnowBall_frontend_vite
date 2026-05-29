@@ -136,6 +136,11 @@ router.beforeEach(async (to, from) => {
 
   const isLoggedIn = userStore.isLogin()
 
+  // 0. 未登录用户访问根路径 → 宣传登录页
+  if (!isLoggedIn && to.path === '/') {
+    return '/login'
+  }
+
   // 1. 未登录用户只能访问公共页面，避免进入需要 API 调用的页面后 401 闪退回登录
   if (!isLoggedIn && !isPublicPath(to.path)) {
     return '/login'
