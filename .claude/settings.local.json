@@ -26,7 +26,26 @@
       "PowerShell(Get-Process *Melancholic)",
       "PowerShell(Stop-Process *)",
       "PowerShell(Get-WmiObject *)",
-      "PowerShell(Set-Location E:\\\\python_project\\\\uCloud_GetInformation; $output = & python -m ucloud.cli.listener 2>&1; $output; \"EXIT CODE: $LASTEXITCODE\")"
+      "PowerShell(Set-Location E:\\\\python_project\\\\uCloud_GetInformation; $output = & python -m ucloud.cli.listener 2>&1; $output; \"EXIT CODE: $LASTEXITCODE\")",
+      "PowerShell(Set-Location E:\\\\python_project\\\\uCloud_GetInformation; $proc = Start-Process -FilePath \"python\" -ArgumentList \"-m ucloud.cli.listener\" -PassThru -WindowStyle Hidden; Start-Sleep -Seconds 4; if \\(-not $proc.HasExited\\) { Write-Output \"OK - PID: $\\($proc.Id\\)\" } else { Write-Output \"FAILED - exit code: $\\($proc.ExitCode\\)\" })",
+      "PowerShell(cmd /c \"cd /d E:\\\\python_project\\\\uCloud_GetInformation && start \"uCloud-Listener\" /MIN python -m ucloud.cli.listener\")",
+      "PowerShell(Remove-Item *)",
+      "PowerShell(Test-Path E:\\\\python_project\\\\uCloud_GetInformation\\\\.message_buffer.json; if \\(Test-Path E:\\\\python_project\\\\uCloud_GetInformation\\\\.message_buffer.json\\) { $data = Get-Content E:\\\\python_project\\\\uCloud_GetInformation\\\\.message_buffer.json -Raw | ConvertFrom-Json; $count = $data.Count; if \\($count\\) { $first = $data[0]; $last = $data[-1]; $t1 = [DateTimeOffset]::FromUnixTimeSeconds\\([long]$first.time\\).LocalDateTime; $t2 = [DateTimeOffset]::FromUnixTimeSeconds\\([long]$last.time\\).LocalDateTime; Write-Output \"磁盘: $count 条\"; Write-Output \"最早: $t1\"; Write-Output \"最晚: $t2\" } else { Write-Output \"磁盘文件为空\" } } else { Write-Output \"磁盘文件不存在\" })",
+      "PowerShell(Get-ChildItem \"C:\\\\Users\\\\cheny\\\\AppData\\\\Roaming\" -Directory | Where-Object { $_.Name -match \"napcat|qq|bot\" } | Select-Object FullName; Get-ChildItem \"C:\\\\Users\\\\cheny\\\\Documents\" -Directory -ErrorAction SilentlyContinue | Where-Object { $_.Name -match \"napcat|qq\" })",
+      "PowerShell(Invoke-RestMethod -Uri \"http://127.0.0.1:3000/get_group_msg_history\" -Method Post -Body '{\"group_id\": 1094124630, \"count\": 3}' -ContentType \"application/json\" | ConvertTo-Json -Depth 3)",
+      "PowerShell(Test-Path *)",
+      "PowerShell(powercfg *)",
+      "PowerShell(Get-Content *)",
+      "PowerShell(& \"E:\\\\python_project\\\\AI_advanced_Third\\\\.venv\\\\Scripts\\\\pip.exe\" install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu numpy pandas scikit-learn matplotlib seaborn onnx onnxruntime tensorboard -q 2>&1 | Select-Object -Last 5)",
+      "PowerShell(& \"E:\\\\python_project\\\\AI_advanced_Third\\\\.venv\\\\Scripts\\\\python.exe\" --version)",
+      "PowerShell(& \"E:\\\\python_project\\\\AI_advanced_Third\\\\.venv\\\\Scripts\\\\python.exe\" -m pip install --upgrade pip -q 2>&1 | Select-Object -Last 3)",
+      "PowerShell(& \"E:\\\\python_project\\\\AI_advanced_Third\\\\.venv\\\\Scripts\\\\pip.exe\" install torch --index-url https://download.pytorch.org/whl/cpu 2>&1 | Select-Object -Last 5)",
+      "PowerShell(& \"E:\\\\python_project\\\\AI_advanced_Third\\\\.venv\\\\Scripts\\\\pip.exe\" install numpy pandas scikit-learn matplotlib seaborn onnx onnxruntime tensorboard 2>&1 | Select-Object -Last 10)",
+      "PowerShell(& \"E:\\\\python_project\\\\AI_advanced_Third\\\\.venv\\\\Scripts\\\\pip.exe\" install pandas 2>&1 | Select-Object -Last 5)",
+      "PowerShell(& \"E:\\\\python_project\\\\AI_advanced_Third\\\\.venv\\\\Scripts\\\\pip.exe\" install matplotlib seaborn onnx onnxruntime tensorboard 2>&1 | Select-Object -Last 10)",
+      "PowerShell(& \"E:\\\\python_project\\\\AI_advanced_Third\\\\.venv\\\\Scripts\\\\pip.exe\" install onnxscript 2>&1 | Select-Object -Last 3)",
+      "PowerShell(if \\(Test-Path \"E:\\\\python_project\\\\AI_advanced_Third\\\\assignment_output.txt\"\\) { $content = Get-Content \"E:\\\\python_project\\\\AI_advanced_Third\\\\assignment_output.txt\" -Raw -Encoding UTF8; if \\($content\\) { $lines = $content -split \"`n\"; Write-Output \"Total lines: $\\($lines.Count\\)\"; $lines[-60..-1] -join \"`n\" } else { Write-Output \"File empty\" } } else { Write-Output \"No output\" })",
+      "PowerShell(if \\(Test-Path \"E:\\\\python_project\\\\AI_advanced_Third\\\\assignment_output.txt\"\\) { $content = Get-Content \"E:\\\\python_project\\\\AI_advanced_Third\\\\assignment_output.txt\" -Raw -Encoding UTF8; if \\($content\\) { $lines = $content -split \"`n\"; Write-Output \"Total lines: $\\($lines.Count\\)\"; $lines[-70..-1] -join \"`n\" } })"
     ]
   }
 }

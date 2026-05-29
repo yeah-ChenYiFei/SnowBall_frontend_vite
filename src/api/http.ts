@@ -62,6 +62,12 @@ http.interceptors.response.use(
       return Promise.reject(new Error('网络连接异常，请稍后重试'))
     }
 
+    // 登录接口的 401 是业务错误（密码错误等），直接透传错误消息
+    if (error.response.status === 401 && error.config?.url?.includes('/auth/login')) {
+      const msg = error.response.data?.message || '用户名或密码错误'
+      return Promise.reject(new Error(msg))
+    }
+
     // 处理 401：公开页面不跳转登录，仅静默清除过期 token
     if (error.response.status === 401) {
       const userStore = useUserStore()
