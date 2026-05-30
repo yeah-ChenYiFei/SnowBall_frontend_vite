@@ -6,6 +6,7 @@ import SnowBg from '@/components/SnowBg.vue'
 import GlassCard from '@/components/GlassCard.vue'
 import AppButton from '@/components/AppButton.vue'
 import AppInput from '@/components/AppInput.vue'
+import PromoCarousel from '@/components/PromoCarousel.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -59,7 +60,9 @@ const loginSection = ref<HTMLElement | null>(null)
 const hasReachedLogin = ref(false)
 const isTransitioning = ref(false)
 const indicatorOpacity = ref(1)
+const heroBrandOpacity = ref(1)
 const loginVisible = ref(false)
+const loginBrandVisible = ref(false)
 
 const SNAP_THRESHOLD = 0.12 // 12% of hero height triggers snap
 
@@ -78,8 +81,9 @@ function onScroll() {
   const heroH = el.clientHeight
   const scrollTop = el.scrollTop
 
-  // Fade indicator as user scrolls
+  // Fade indicator and hero brand as user scrolls
   indicatorOpacity.value = Math.max(0, 1 - scrollTop / (heroH * 0.3))
+  heroBrandOpacity.value = Math.max(0, 1 - scrollTop / (heroH * 0.18))
 
   // Already locked to login — clamp if user tries to scroll up
   if (hasReachedLogin.value) {
@@ -100,6 +104,7 @@ function onScroll() {
       hasReachedLogin.value = true
       isTransitioning.value = false
       loginVisible.value = true
+      loginBrandVisible.value = true
     }, 700)
   }
 }
@@ -176,6 +181,21 @@ onMounted(() => {
     >
       <!-- Hero / landing section -->
       <section class="hero-section">
+        <div class="hero-content">
+          <!-- Left column: brand intro -->
+          <div class="hero-left" :style="{ opacity: heroBrandOpacity }">
+            <div class="hero-brand-art">
+              <span class="hero-char-xue">雪</span>
+              <span class="hero-char-qiu">球</span>
+            </div>
+          </div>
+
+          <!-- Right column: image carousel -->
+          <div class="hero-right">
+            <PromoCarousel />
+          </div>
+        </div>
+
         <!-- Scroll-down indicator: two parallel downward chevrons -->
         <div class="scroll-indicator" :style="{ opacity: indicatorOpacity }">
           <div class="chevron"></div>
@@ -186,6 +206,14 @@ onMounted(() => {
 
       <!-- Login section -->
       <section ref="loginSection" class="login-section">
+        <!-- Brand art at bottom-left of login section -->
+        <Transition name="login-brand-fade">
+          <div v-if="loginBrandVisible" class="login-brand-art">
+            <span class="login-char-xue">雪</span>
+            <span class="login-char-qiu">球</span>
+          </div>
+        </Transition>
+
         <GlassCard class="login-card" :class="{ visible: loginVisible }">
           <div class="card-brand">
             <h1 class="brand-title">雪球</h1>
@@ -336,8 +364,87 @@ onMounted(() => {
   height: 100vh;
   scroll-snap-align: start;
   display: flex;
+  align-items: center;
   justify-content: center;
+  padding: 0 60px;
+}
+
+.hero-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  max-width: 1200px;
+}
+
+.hero-left {
+  position: absolute;
+  left: 60px;
+  bottom: -30px;
+  max-width: 340px;
+  z-index: 10;
+  transition: opacity 0.35s ease;
+}
+
+/* ── Artistic brand background text ── */
+.hero-brand-art {
+  pointer-events: none;
+  display: flex;
   align-items: flex-end;
+  gap: 12px;
+  line-height: 0.75;
+  user-select: none;
+  opacity: 0;
+  animation: brand-art-reveal 1.2s cubic-bezier(0.25, 0.1, 0.25, 1) 0.1s forwards;
+}
+
+.hero-char-xue,
+.hero-char-qiu {
+  font-family: 'Noto Serif SC', 'Source Han Serif SC', serif;
+  font-weight: 900;
+  color: rgba(115, 135, 168, 0.09);
+  letter-spacing: 0;
+  -webkit-text-stroke: 2px rgba(115, 135, 168, 0.035);
+}
+
+.hero-char-xue {
+  font-size: 240px;
+}
+
+.hero-char-qiu {
+  font-size: 160px;
+}
+
+@keyframes brand-art-reveal {
+  from {
+    opacity: 0;
+    transform: scale(1.12);
+    filter: blur(16px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+    filter: blur(0);
+  }
+}
+
+
+.hero-right {
+  flex: 0 0 auto;
+  margin-left: auto;
+  opacity: 0;
+  animation: hero-fade-up 0.7s cubic-bezier(0.25, 0.1, 0.25, 1) 0.4s forwards;
+}
+
+@keyframes hero-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* ── Scroll-down indicator ── */
@@ -391,12 +498,56 @@ onMounted(() => {
 
 /* ── Login section ── */
 .login-section {
+  position: relative;
   min-height: 100vh;
   scroll-snap-align: start;
   display: flex;
   justify-content: center;
   align-items: center;
   padding: 40px 20px;
+}
+
+/* ── Login brand art (same position as hero-left) ── */
+.login-brand-art {
+  position: absolute;
+  left: 60px;
+  bottom: 40px;
+  z-index: 8;
+  pointer-events: none;
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  line-height: 0.75;
+  user-select: none;
+}
+
+.login-char-xue,
+.login-char-qiu {
+  font-family: 'Noto Serif SC', 'Source Han Serif SC', serif;
+  font-weight: 900;
+  color: rgba(115, 135, 168, 0.09);
+  letter-spacing: 0;
+  -webkit-text-stroke: 2px rgba(115, 135, 168, 0.035);
+}
+
+.login-char-xue {
+  font-size: 240px;
+}
+
+.login-char-qiu {
+  font-size: 160px;
+}
+
+/* Fade in for login brand */
+.login-brand-fade-enter-active {
+  transition: opacity 0.8s ease 0.3s;
+}
+.login-brand-fade-leave-active {
+  transition: opacity 0.4s ease;
+}
+.login-brand-fade-enter-from,
+.login-brand-fade-leave-to {
+  opacity: 0;
 }
 
 /* ── Login card ── */
@@ -488,6 +639,62 @@ onMounted(() => {
 }
 
 /* ── Responsive ── */
+@media (max-width: 960px) {
+  .hero-section {
+    padding: 0 32px;
+    padding-top: 80px;
+    align-items: flex-start;
+  }
+
+  .hero-content {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 60px;
+  }
+
+  .hero-left {
+    position: static;
+    max-width: 340px;
+  }
+
+  .hero-brand-art {
+    margin-bottom: 0;
+  }
+
+  .hero-char-xue {
+    font-size: 140px;
+  }
+
+  .hero-char-qiu {
+    font-size: 96px;
+  }
+
+  .login-brand-art {
+    left: 32px;
+    bottom: 20px;
+  }
+
+  .login-char-xue {
+    font-size: 140px;
+  }
+
+  .login-char-qiu {
+    font-size: 96px;
+  }
+
+
+  .hero-right {
+    margin-left: 0;
+    width: 100%;
+    display: flex;
+    justify-content: center;
+  }
+
+  .scroll-indicator {
+    bottom: 8%;
+  }
+}
+
 @media (max-width: 480px) {
   .artistic-text {
     top: 24px;
@@ -506,13 +713,43 @@ onMounted(() => {
     font-size: 13px;
   }
 
+  .hero-section {
+    padding: 0 16px;
+    padding-top: 70px;
+  }
+
+  .hero-left {
+    max-width: 260px;
+  }
+
+  .hero-char-xue {
+    font-size: 100px;
+  }
+
+  .hero-char-qiu {
+    font-size: 72px;
+  }
+
+  .login-brand-art {
+    left: 16px;
+    bottom: 5px;
+  }
+
+  .login-char-xue {
+    font-size: 100px;
+  }
+
+  .login-char-qiu {
+    font-size: 72px;
+  }
+
   .login-card {
     padding: 36px 28px 28px;
     max-width: 340px;
   }
 
   .scroll-indicator {
-    bottom: 15%;
+    bottom: 10%;
   }
 }
 </style>

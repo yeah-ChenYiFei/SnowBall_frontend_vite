@@ -189,7 +189,7 @@ onMounted(async () => {
 /* ---- Vertical line container ---- */
 .timeline-line-bar { position: absolute; left: 16px; top: 0; bottom: 0; width: 2px; overflow: hidden; pointer-events: none; }
 .timeline-line {
-  width: 100%; height: 100%; background: linear-gradient(to bottom, #7c3aed 0%, #dadce0 100%);
+  width: 100%; height: 100%; background: linear-gradient(to bottom, #9aa0a6 0%, #dadce0 100%);
   transform: scaleY(0); transform-origin: top;
   transition: transform 0.8s cubic-bezier(0.22, 1, 0.36, 1);
 }
@@ -231,7 +231,7 @@ onMounted(async () => {
 
 .tl-dot-inner {
   position: absolute; inset: 3px; border-radius: 50%;
-  background: #7c3aed;
+  background: #9aa0a6;
   transform: scale(0);
   transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
@@ -296,8 +296,8 @@ onMounted(async () => {
 .tl-preview { transition-delay: calc(var(--delay) + 450ms); }
 
 /* ---- Hover ---- */
-.tl-item:hover .tl-dot { box-shadow: 0 0 0 6px rgba(124,58,237,0.12); }
-.tl-item:hover .tl-title { color: #7c3aed; }
+.tl-item:hover .tl-dot { box-shadow: 0 0 0 6px rgba(120, 130, 150, 0.15); }
+.tl-item:hover .tl-title { color: #5f6368; }
 
 /* ===== INSPIRATION DETAIL MODAL ===== */
 .insp-overlay {
