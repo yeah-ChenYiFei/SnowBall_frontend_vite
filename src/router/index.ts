@@ -5,6 +5,7 @@ import { ROLES } from '@/constants/role' // ✅ 引入常量
 
 // 按需引入所有页面组件 (保持你原来的不变)
 import Home from '@/views/Home.vue'
+import CreationCenter from '@/views/CreationCenter.vue'
 import Plaza from '@/views/Plaza.vue'
 import Create from '@/views/Create.vue'
 import SettingWriting from '@/views/create/SettingWriting.vue'
@@ -31,6 +32,11 @@ import Friends from '@/views/user/Friends.vue'
 import Notifications from '@/views/user/Notifications.vue'
 import WritingCenter from '@/views/writing/WritingCenter.vue'
 import WritingEditor from '@/views/writing/WritingEditor.vue'
+import NovelEditor from '@/views/writing/NovelEditor.vue'
+import NovelHub from '@/views/writing/NovelHub.vue'
+import EssayEditor from '@/views/writing/EssayEditor.vue'
+import DiaryEditor from '@/views/writing/DiaryEditor.vue'
+import ShardPicker from '@/views/writing/ShardPicker.vue'
 import WritingLibrary from '@/views/writing/WritingLibrary.vue'
 import WritingDiary from '@/views/writing/WritingDiary.vue'
 import ChatView from '@/views/chat/ChatView.vue'
@@ -50,7 +56,8 @@ import Favorites from '@/views/user/Favorites.vue'
 const router = createRouter({
   history: createWebHistory(),
   routes: [
-    { path: '/', component: Plaza },
+    { path: '/', component: CreationCenter },
+    { path: '/plaza', component: Plaza },
     { path: '/create', component: Create, meta: { requiresAuth: true } },
     { path: '/create/setting', component: SettingWriting },
     { path: '/create/setting/:worldId', component: WorldDetail },
@@ -77,9 +84,16 @@ const router = createRouter({
     { path: '/groups/:groupId', component: GroupDetail, meta: { requiresAuth: true } },
     { path: '/notifications', component: Notifications, meta: { requiresAuth: true } },
     { path: '/writing', component: WritingCenter },
+    { path: '/writing/shards', component: ShardPicker },
     { path: '/writing/new', component: WritingEditor },
+    { path: '/writing/novel/new', component: NovelHub },
+    { path: '/writing/novel/:id', component: NovelEditor },
+    { path: '/writing/essay/new', component: EssayEditor },
+    { path: '/writing/essay/:id', component: EssayEditor },
+    { path: '/writing/diary/new', component: DiaryEditor },
+    { path: '/writing/diary/:id', component: DiaryEditor },
     { path: '/writing/library', component: WritingLibrary },
-    { path: '/writing/diary', component: WritingDiary },
+    { path: '/writing/diary-list', component: WritingDiary },
     { path: '/writing/:id', component: WritingEditor },
     { path: '/chat', component: ChatView, meta: { requiresAuth: true } },
     { path: '/chat/:userId', component: ChatView, meta: { requiresAuth: true } },
@@ -103,7 +117,7 @@ const router = createRouter({
 
 // 无需登录即可访问的公共页面
 const PUBLIC_PATHS = new Set([
-  '/',
+  '/plaza',
   '/login',
   '/register',
   '/verify-email',

@@ -89,7 +89,7 @@ const goToPost = (id: number) => {
 }
 
 const goToDiary = () => {
-  router.push('/writing/new?type=DIARY')
+  router.push('/writing/diary/new')
 }
 
 const goToInspiration = () => {

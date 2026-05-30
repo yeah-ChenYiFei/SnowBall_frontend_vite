@@ -226,6 +226,24 @@ export interface World {
   collaborators?: Collaborator[]
   isOwner?: boolean
   isCollaborator?: boolean
+  entryCount?: number
+}
+
+export interface NovelCard {
+  id: number
+  userId: number
+  title: string
+  description?: string
+  hasVolumes?: boolean
+  worldId?: number
+  worldName?: string
+  isPublished?: boolean
+  publishedAt?: string
+  chapterCount?: number
+  totalWordCount?: number
+  createdAt: string
+  updatedAt: string
+  authorName?: string
 }
 
 export interface WorldEntry {

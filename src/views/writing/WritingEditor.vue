@@ -185,6 +185,11 @@ const showChapter = computed(() => articleType.value === 'NOVEL')
 
 const types: ArticleType[] = ['ESSAY', 'DIARY', 'NOVEL']
 
+const typeLocked = computed(() => {
+  const qType = route.query.type as string | undefined
+  return qType && ['ESSAY', 'DIARY', 'NOVEL'].includes(qType) ? qType as ArticleType : null
+})
+
 // ===== Novel computed properties =====
 
 // Map of "section:vol" → max chapter number in that scope
@@ -669,7 +674,10 @@ const textareaStyle = computed(() => ({
         返回
       </button>
       <h1 class="editor-title-text">
-        {{ articleType === 'NOVEL' ? (novelPhase === 'create' ? '创建新小说' : '小说写作') : (isEditMode ? '编辑文章' : '新文章') }}
+        <template v-if="typeLocked === 'ESSAY'">{{ isEditMode ? '编辑散文' : '写散文' }}</template>
+        <template v-else-if="typeLocked === 'DIARY'">{{ isEditMode ? '编辑日记' : '写日记' }}</template>
+        <template v-else-if="typeLocked === 'NOVEL' || articleType === 'NOVEL'">{{ novelPhase === 'create' ? '创建新小说' : '小说写作' }}</template>
+        <template v-else>{{ isEditMode ? '编辑文章' : '新文章' }}</template>
       </h1>
       <div class="header-spacer"></div>
       <button
@@ -690,8 +698,8 @@ const textareaStyle = computed(() => ({
         {{ message }}
       </div>
 
-      <!-- Type Selector (always visible) -->
-      <div class="type-selector">
+      <!-- Type Selector (hidden when type is locked via query param) -->
+      <div v-if="!typeLocked" class="type-selector">
         <button
           v-for="t in types"
           :key="t"

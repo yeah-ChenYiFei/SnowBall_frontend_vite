@@ -6,7 +6,7 @@ import type { Result } from '@/types'
 
 // 公开路径：处于这些路径时 401 不跳转登录页，只静默清除 token
 function isPublicPathFor401(path: string): boolean {
-  const publics = ['/', '/login', '/register', '/explore', '/about', '/wild/chains']
+  const publics = ['/', '/plaza', '/login', '/register', '/explore', '/about', '/wild/chains']
   if (publics.includes(path)) return true
   if (/^\/post\/\d+$/.test(path)) return true
   if (/^\/chain\/\d+$/.test(path)) return true
@@ -33,6 +33,10 @@ http.interceptors.request.use(config => {
   const userStore = useUserStore()
   if (userStore.token) {
     config.headers.Authorization = `Bearer ${userStore.token}`
+  }
+  // Add idempotency key for state-changing requests to prevent duplicates
+  if (config.method === 'post' || config.method === 'put' || config.method === 'delete') {
+    config.headers['X-Idempotency-Key'] = crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2)
   }
   return config
 })

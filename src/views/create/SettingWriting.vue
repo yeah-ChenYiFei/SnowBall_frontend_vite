@@ -9,616 +9,242 @@ import ToggleSwitch from '@/components/ToggleSwitch.vue'
 const router = useRouter()
 
 const worlds = ref<World[]>([])
-const showModal = ref(false)
+const isLoading = ref(false)
+
+const form = ref({ name: '', description: '', type: '', isPublic: false })
 const isSubmitting = ref(false)
 const message = ref('')
 
-// Co-create state
-const showCollaboratorModal = ref(false)
-const collaboratorWorldId = ref(0)
-const collaboratorWorldCollabs = ref<any[]>([])
-
-function openCollaboratorModal(e: Event, w: World) {
-  e.stopPropagation()
-  collaboratorWorldId.value = w.id
-  collaboratorWorldCollabs.value = w.collaborators || []
-  showCollaboratorModal.value = true
-}
-
-function onCollaboratorAdded() {
-  loadWorlds()
-}
-
-const form = ref({
-  name: '',
-  description: '',
-  type: '',
-  isPublic: true,
-})
-
 const typeOptions = ref(['奇幻', '科幻', '都市', '古风', '末世', '架空历史', '其他'])
 const newType = ref('')
-const showNewTypeInput = ref(false)
+const showNewType = ref(false)
 
-function startNewType() {
-  newType.value = ''
-  showNewTypeInput.value = true
-}
+const showCollab = ref(false)
+const collabWorldId = ref(0)
+const collabWorldCollabs = ref<any[]>([])
 
-function confirmNewType() {
-  const t = newType.value.trim()
-  if (t && !typeOptions.value.includes(t)) {
-    typeOptions.value.push(t)
-    form.value.type = t
-  }
-  showNewTypeInput.value = false
-}
-
-function cancelNewType() {
-  showNewTypeInput.value = false
+function formatDate(iso: string) {
+  const d = new Date(iso)
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
 }
 
 async function loadWorlds() {
+  isLoading.value = true
+  try { const r = await http.get('/worlds'); worlds.value = (r.data || []) as World[] }
+  catch (e: any) { message.value = e.message || '加载失败' }
+  finally { isLoading.value = false }
+}
+
+function startNewType() { newType.value = ''; showNewType.value = true }
+function confirmNewType() {
+  const t = newType.value.trim()
+  if (t && !typeOptions.value.includes(t)) { typeOptions.value.push(t); form.value.type = t }
+  showNewType.value = false
+}
+
+async function createWorld() {
+  if (!form.value.name.trim()) { message.value = '请输入世界名称'; return }
+  if (!form.value.type) { message.value = '请选择世界观类型'; return }
+  isSubmitting.value = true; message.value = ''
   try {
-    const res = await http.get('/worlds') as unknown as Result<World[]>
-    if (res.code === 200) worlds.value = res.data
-  } catch (e: any) {
-    message.value = e.message || '加载失败'
-  }
+    const r = await http.post('/worlds', form.value)
+    worlds.value.unshift(r.data as World)
+    form.value = { name: '', description: '', type: '', isPublic: false }
+  } catch (e: any) { message.value = e.message || '创建失败' }
+  finally { isSubmitting.value = false }
 }
 
-function openModal() {
-  form.value = { name: '', description: '', type: '', isPublic: false }
-  showNewTypeInput.value = false
-  newType.value = ''
-  showModal.value = true
-}
+function goWorld(id: number) { router.push(`/create/setting/${id}`) }
 
-function closeModal() {
-  if (isSubmitting.value) return
-  showModal.value = false
-}
-
-async function handleCreate() {
-  if (!form.value.name.trim()) {
-    message.value = '世界名称不能为空'
-    return
-  }
-  if (!form.value.type) {
-    message.value = '请选择世界观类型'
-    return
-  }
-  isSubmitting.value = true
-  message.value = ''
-  try {
-    const res = await http.post('/worlds', form.value) as unknown as Result<World>
-    if (res.code === 200) {
-      showModal.value = false
-      worlds.value.unshift(res.data)
-    }
-  } catch (e: any) {
-    message.value = e.message || '创建失败'
-  } finally {
-    isSubmitting.value = false
-  }
+function openCollab(e: Event, w: World) {
+  e.stopPropagation()
+  collabWorldId.value = w.id; collabWorldCollabs.value = w.collaborators || []; showCollab.value = true
 }
 
 onMounted(loadWorlds)
 </script>
 
 <template>
-  <div class="setting-page">
-    <h1 class="page-title">设定编写</h1>
-    <p class="section-label">已创建的世界</p>
-
-    <button class="btn-add-world" @click="openModal">+ 添加全新世界</button>
-
-    <div v-if="worlds.length === 0" class="empty-hint">尚未创建任何世界，点击上方按钮开始构建你的世界观。</div>
-
-    <div class="world-grid">
-      <div
-        v-for="w in worlds"
-        :key="w.id"
-        class="world-card"
-        @click="router.push(`/create/setting/${w.id}`)"
-      >
-        <div class="card-name">
-          {{ w.name }}
-          <span v-if="w.collaborators && w.collaborators.length >= 2" class="shared-badge">👥 共创</span>
+  <div class="sw-page">
+    <div class="sw-layout">
+      <!-- LEFT: World list -->
+      <div class="sw-left">
+        <div class="sw-section-head">
+          <div>
+            <h2>我的世界</h2>
+            <span class="sw-sub">管理你创建的所有世界观</span>
+          </div>
+          <span class="sw-count">{{ worlds.length }} 个</span>
         </div>
-        <div class="card-meta">
-          <span v-if="w.type" class="card-type">{{ w.type }}</span>
-          <button
-            v-if="w.isOwner"
-            class="btn-co-create"
-            @click="openCollaboratorModal($event, w)"
-          >
-            {{ w.collaborators && w.collaborators.length >= 2 ? '管理共创' : '共创' }}
-          </button>
+
+        <div v-if="isLoading" class="sw-loading">加载中...</div>
+        <div v-else-if="worlds.length === 0" class="sw-empty">
+          <span class="sw-empty-icon">🌌</span>
+          <span>还没有世界，在右侧创建你的第一个世界观</span>
         </div>
-        <div class="card-desc">{{ w.description || '暂无简介' }}</div>
+        <div v-else class="sw-list">
+          <div v-for="w in worlds" :key="w.id" class="sw-card" @click="goWorld(w.id)">
+            <div class="swc-top">
+              <div class="swc-head">
+                <h3 class="swc-name">{{ w.name }}</h3>
+                <span v-if="w.isOwner" class="swc-owner">我创建的</span>
+                <span v-else-if="w.isCollaborator" class="swc-collab">共创</span>
+                <span v-if="!w.isPublic" class="swc-private">私密</span>
+              </div>
+              <span v-if="w.type" class="swc-type">{{ w.type }}</span>
+            </div>
+            <div class="swc-meta">
+              <span v-if="w.entryCount != null">{{ w.entryCount }} 条目</span>
+              <span v-if="w.collaborators?.length">{{ w.collaborators.length }} 共创者</span>
+            </div>
+            <p v-if="w.description" class="swc-desc">{{ w.description }}</p>
+            <div class="swc-foot">
+              <span class="swc-date">{{ formatDate(w.updatedAt || w.createdAt) }}</span>
+              <button v-if="w.isOwner" class="swc-collab-btn" @click="openCollab($event, w)">
+                {{ w.collaborators && w.collaborators.length >= 2 ? '管理' : '共创' }}
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
-    </div>
 
-    <!-- 弹窗 -->
-    <transition name="modal">
-      <div v-if="showModal" class="modal-overlay" @click.self="closeModal">
-        <div class="modal-box">
-          <h2 class="modal-title">创建新世界</h2>
+      <!-- RIGHT: Create form (always visible) -->
+      <div class="sw-right">
+        <div class="sw-create-card">
+          <h2 class="sw-create-head">创建新世界</h2>
 
-          <div v-if="message" class="modal-error">{{ message }}</div>
+          <div v-if="message" class="sw-msg sw-msg-err">{{ message }}</div>
 
-          <div class="form-row">
-            <label class="form-label">新世界名称</label>
-            <input
-              v-model="form.name"
-              type="text"
-              class="form-input"
-              placeholder="给你的世界起个名字"
-              @keyup.enter="handleCreate"
-            />
+          <div class="sw-field">
+            <label class="sw-label">名称</label>
+            <input v-model="form.name" class="sw-input sw-input-lg" placeholder="给你的世界起个名字..."
+                   @keyup.enter="createWorld" />
           </div>
 
-          <div class="form-row">
-            <label class="form-label">类型</label>
-            <div class="type-select-row">
-              <select v-model="form.type" class="form-input form-select-type">
+          <div class="sw-field">
+            <label class="sw-label">类型</label>
+            <div class="sw-type-row">
+              <select v-model="form.type" class="sw-input">
                 <option value="" disabled>选择世界观类型</option>
                 <option v-for="t in typeOptions" :key="t" :value="t">{{ t }}</option>
               </select>
-              <button
-                v-if="!showNewTypeInput"
-                type="button"
-                class="btn-new-type"
-                @click="startNewType"
-              >
-                + 添加新类型
-              </button>
+              <button v-if="!showNewType" class="sw-type-add" @click="startNewType">+ 新类型</button>
             </div>
-            <div v-if="showNewTypeInput" class="new-type-row">
-              <input
-                v-model="newType"
-                type="text"
-                class="form-input form-input-new-type"
-                placeholder="输入新类型名称"
-                @keyup.enter="confirmNewType"
-              />
-              <button type="button" class="btn-confirm-type" @click="confirmNewType">确定</button>
-              <button type="button" class="btn-cancel-type" @click="cancelNewType">取消</button>
+            <div v-if="showNewType" class="sw-new-type-row">
+              <input v-model="newType" class="sw-input" placeholder="输入新类型..." @keyup.enter="confirmNewType" />
+              <button class="sw-btn-sm amber" @click="confirmNewType">确定</button>
+              <button class="sw-btn-sm" @click="showNewType = false">取消</button>
             </div>
           </div>
 
-          <div class="form-row">
-            <label class="form-label">简介</label>
-            <textarea
-              v-model="form.description"
-              class="form-input form-textarea"
-              rows="3"
-              placeholder="简单描述这个世界的背景..."
-            ></textarea>
+          <div class="sw-field">
+            <label class="sw-label">简介</label>
+            <textarea v-model="form.description" class="sw-input sw-textarea" rows="3"
+                      placeholder="简单描述这个世界的背景..."></textarea>
           </div>
 
-          <div class="form-row form-row-inline" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
-            <label class="form-label" style="margin:0">公开世界</label>
-            <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
+          <div class="sw-field sw-field-inline">
+            <label class="sw-label">公开世界</label>
+            <div class="sw-toggle-row">
               <ToggleSwitch v-model="form.isPublic" />
-              <span style="font-size:13px;color:#5f6368">{{ form.isPublic ? '所有人可见' : '仅自己可见' }}</span>
-            </label>
+              <span class="sw-toggle-text">{{ form.isPublic ? '所有人可见' : '仅自己可见' }}</span>
+            </div>
           </div>
 
-          <div class="modal-actions">
-            <button class="btn-cancel" @click="closeModal" :disabled="isSubmitting">取消</button>
-            <button class="btn-create" @click="handleCreate" :disabled="isSubmitting">
-              {{ isSubmitting ? '创建中...' : '创建！' }}
-            </button>
-          </div>
+          <button class="sw-btn-create" :disabled="isSubmitting || !form.name.trim() || !form.type"
+                  @click="createWorld">
+            {{ isSubmitting ? '创建中...' : '创建世界 ✨' }}
+          </button>
         </div>
       </div>
-    </transition>
+    </div>
+
     <WorldCollaboratorModal
-      :show="showCollaboratorModal"
-      :world-id="collaboratorWorldId"
-      :existing-collaborators="collaboratorWorldCollabs"
-      @close="showCollaboratorModal = false"
-      @added="onCollaboratorAdded"
-    />
+      :show="showCollab" :world-id="collabWorldId" :existing-collaborators="collabWorldCollabs"
+      @close="showCollab = false" @added="loadWorlds" />
   </div>
 </template>
 
 <style scoped>
-.setting-page {
-  max-width: 900px;
-  margin: 0 auto;
-  padding: 40px 20px;
-}
+.sw-page { max-width: 1100px; margin: 0 auto; padding: 24px 20px; }
 
-.page-title {
-  font-size: 26px;
-  font-weight: 600;
-  color: #202124;
-  margin-bottom: 8px;
-}
+.sw-layout { display: grid; grid-template-columns: 1fr 390px; gap: 28px; align-items: start; }
 
-.section-label {
-  color: #5f6368;
-  font-size: 14px;
-  margin-bottom: 20px;
-}
+/* ===== LEFT ===== */
+.sw-section-head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 18px; }
+.sw-section-head h2 { margin: 0; font-size: 22px; color: #202124; }
+.sw-sub { font-size: 13px; color: #999; display: block; margin-top: 2px; }
+.sw-count { font-size: 13px; color: #999; }
 
-/* 添加按钮 */
-.btn-add-world {
-  display: block;
-  width: 100%;
-  padding: 14px 0;
-  border: 2px dashed #a8c7fa;
-  background: #f0f6ff;
-  color: #1a73e8;
-  border-radius: 10px;
-  font-size: 15px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  margin-bottom: 28px;
-}
-.btn-add-world:hover {
-  background: #e3efff;
-  border-color: #1a73e8;
-}
+.sw-loading { text-align: center; padding: 80px 0; color: #999; }
+.sw-empty { text-align: center; padding: 60px 20px; color: #999; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.sw-empty-icon { font-size: 40px; }
 
-.empty-hint {
-  text-align: center;
-  color: #9aa0a6;
-  font-size: 14px;
-  padding: 40px 0;
+.sw-list { display: flex; flex-direction: column; gap: 12px; }
+.sw-card {
+  background: #fff; border: 1px solid #d2e3fc; border-radius: 12px;
+  padding: 20px 22px; cursor: pointer; transition: all 0.2s;
 }
+.sw-card:hover { border-color: #1a73e8; box-shadow: 0 4px 16px rgba(26,115,232,0.08); transform: translateY(-1px); }
 
-/* 世界卡片网格 */
-.world-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 20px;
-}
+.swc-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
+.swc-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.swc-name { font-size: 17px; font-weight: 600; color: #202124; margin: 0; }
+.swc-owner { font-size: 11px; padding: 2px 6px; background: #e8f0fe; color: #1a73e8; border-radius: 6px; }
+.swc-collab { font-size: 11px; padding: 2px 6px; background: #e6f4ea; color: #137333; border-radius: 6px; }
+.swc-private { font-size: 11px; padding: 2px 6px; background: #f1f3f4; color: #5f6368; border-radius: 6px; }
+.swc-type { font-size: 12px; padding: 2px 10px; background: rgba(26,115,232,0.08); color: #1a73e8; border-radius: 12px; }
 
-.world-card {
-  background-color: #e8f0fe;
-  background-image: url("data:image/svg+xml,%3Csvg width='4' height='4' viewBox='0 0 4 4' xmlns='http://www.w3.org/2000/svg'%3E%3Ccircle cx='0.5' cy='0.5' r='0.5' fill='%231a73e8' fill-opacity='0.06'/%3E%3C/svg%3E");
-  border: 1px solid #d2e3fc;
-  border-radius: 14px;
-  padding: 22px 24px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-.world-card:hover {
-  border-color: #1a73e8;
-  box-shadow: 0 4px 16px rgba(26, 115, 232, 0.09);
-  transform: translateY(-2px);
-}
+.swc-meta { display: flex; gap: 14px; font-size: 12px; color: #5f6368; margin-bottom: 8px; }
+.swc-desc { font-size: 13px; color: #5f6368; line-height: 1.5; margin: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.swc-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; }
+.swc-date { font-size: 12px; color: #999; }
+.swc-collab-btn { padding: 5px 14px; background: #e8f0fe; color: #1a73e8; border: none; border-radius: 6px; font-size: 12px; cursor: pointer; font-family: inherit; }
+.swc-collab-btn:hover { background: #d2e3fc; }
 
-.card-name {
-  font-size: 17px;
-  font-weight: 600;
-  color: #202124;
-  margin-bottom: 8px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
+/* ===== RIGHT ===== */
+.sw-right { position: sticky; top: 24px; }
 
-.private-badge {
-  font-size: 11px;
-  font-weight: 500;
-  color: #5f6368;
-  background: #f1f3f4;
-  padding: 2px 8px;
-  border-radius: 10px;
+.sw-create-card {
+  background: #fff; border: 1px solid #d2e3fc; border-radius: 14px; padding: 28px 26px;
 }
+.sw-create-head { font-size: 20px; color: #202124; margin: 0 0 20px 0; }
 
-.card-meta {
-  margin-bottom: 10px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-.card-meta-right {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-.toggle-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  cursor: pointer;
-}
-.toggle-label {
-  font-size: 12px;
-  color: #5f6368;
-}
+.sw-msg { padding: 8px 12px; border-radius: 6px; font-size: 13px; margin-bottom: 14px; }
+.sw-msg-err { background: #fce8e6; color: #d93025; }
 
-.card-type {
-  display: inline-block;
-  font-size: 12px;
-  background: rgba(26, 115, 232, 0.1);
-  color: #1a73e8;
-  padding: 2px 10px;
-  border-radius: 20px;
-}
+.sw-field { margin-bottom: 18px; }
+.sw-label { display: block; font-size: 13px; font-weight: 500; color: #5f6368; margin-bottom: 5px; }
+.sw-input { width: 100%; padding: 10px 12px; border: 1px solid #dadce0; border-radius: 8px; font-size: 14px; outline: none; font-family: inherit; box-sizing: border-box; transition: border-color 0.2s; }
+.sw-input:focus { border-color: #1a73e8; box-shadow: 0 0 0 2px rgba(26,115,232,0.1); }
+.sw-input-lg { font-size: 17px; font-weight: 500; padding: 12px; }
+.sw-textarea { resize: vertical; }
 
-.btn-co-create {
-  font-size: 12px;
-  padding: 3px 10px;
-  background: #1a73e8;
-  color: #fff;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: background 0.15s;
-}
-.btn-co-create:hover { background: #1557b0; }
+.sw-type-row { display: flex; gap: 8px; align-items: center; }
+.sw-type-add { padding: 8px 14px; background: #e8f0fe; color: #1a73e8; border: 1px dashed #1a73e8; border-radius: 8px; font-size: 12px; cursor: pointer; white-space: nowrap; font-family: inherit; }
+.sw-type-add:hover { background: #d2e3fc; }
 
-.shared-badge {
-  font-size: 12px;
-  background: #e6f4ea;
-  color: #137333;
-  padding: 2px 8px;
-  border-radius: 4px;
-  margin-left: 8px;
-}
+.sw-new-type-row { display: flex; gap: 6px; align-items: center; margin-top: 8px; }
+.sw-btn-sm { padding: 6px 14px; border: 1px solid #dadce0; background: #fff; border-radius: 6px; font-size: 12px; cursor: pointer; font-family: inherit; }
+.sw-btn-sm.amber { background: #1a73e8; color: #fff; border: none; }
+.sw-btn-sm.amber:hover { background: #1557b0; }
 
-.card-desc {
-  font-size: 13px;
-  color: #5f6368;
-  line-height: 1.5;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
+.sw-field-inline { display: flex; align-items: center; justify-content: space-between; }
+.sw-field-inline .sw-label { margin-bottom: 0; }
+.sw-toggle-row { display: flex; align-items: center; gap: 10px; }
+.sw-toggle-text { font-size: 13px; color: #5f6368; }
 
-/* 弹窗 */
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 2000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(0, 0, 0, 0.25);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
+.sw-btn-create {
+  width: 100%; margin-top: 6px; padding: 13px 0; border: none;
+  background: #1a73e8; color: #fff; border-radius: 10px;
+  font-size: 15px; font-weight: 500; cursor: pointer; font-family: inherit;
+  transition: all 0.2s; box-shadow: 0 2px 10px rgba(26,115,232,0.22);
 }
+.sw-btn-create:hover:not(:disabled) { background: #1557b0; }
+.sw-btn-create:disabled { background: #a8c7fa; cursor: not-allowed; box-shadow: none; }
 
-.modal-box {
-  background: #fff;
-  border-radius: 16px;
-  padding: 32px 36px;
-  width: 440px;
-  max-width: 90vw;
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.15);
-}
-
-.modal-title {
-  font-size: 20px;
-  font-weight: 600;
-  color: #202124;
-  margin-bottom: 24px;
-}
-
-.modal-error {
-  background: #fce8e6;
-  color: #d93025;
-  padding: 10px 14px;
-  border-radius: 8px;
-  font-size: 13px;
-  margin-bottom: 16px;
-}
-
-.form-row {
-  margin-bottom: 18px;
-}
-
-.form-label {
-  display: block;
-  font-size: 14px;
-  font-weight: 500;
-  color: #202124;
-  margin-bottom: 6px;
-}
-
-.form-input {
-  width: 100%;
-  padding: 10px 12px;
-  border: 1px solid #dadce0;
-  border-radius: 8px;
-  font-size: 14px;
-  outline: none;
-  box-sizing: border-box;
-  font-family: inherit;
-}
-.form-input:focus {
-  border-color: #1a73e8;
-  box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.1);
-}
-
-.form-textarea {
-  resize: vertical;
-}
-
-.type-select-row {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
-.form-select-type {
-  flex: 1;
-}
-
-.btn-new-type {
-  padding: 8px 14px;
-  background: #e8f0fe;
-  color: #1a73e8;
-  border: 1px dashed #1a73e8;
-  border-radius: 8px;
-  font-size: 13px;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: all 0.15s;
-}
-.btn-new-type:hover {
-  background: #d2e3fc;
-}
-
-.new-type-row {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  margin-top: 8px;
-}
-
-.form-input-new-type {
-  flex: 1;
-}
-
-.btn-confirm-type {
-  padding: 8px 14px;
-  background: #1a73e8;
-  color: #fff;
-  border: none;
-  border-radius: 8px;
-  font-size: 13px;
-  cursor: pointer;
-  white-space: nowrap;
-}
-.btn-confirm-type:hover { background: #1557b0; }
-
-.btn-cancel-type {
-  padding: 8px 14px;
-  background: #fff;
-  color: #5f6368;
-  border: 1px solid #dadce0;
-  border-radius: 8px;
-  font-size: 13px;
-  cursor: pointer;
-  white-space: nowrap;
-}
-.btn-cancel-type:hover { background: #f8f9fa; }
-
-.form-row-inline {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.toggle-switch {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  cursor: pointer;
-}
-
-.toggle-switch input {
-  display: none;
-}
-
-.toggle-slider {
-  width: 40px;
-  height: 22px;
-  background: #dadce0;
-  border-radius: 11px;
-  position: relative;
-  transition: background 0.2s;
-}
-
-.toggle-slider::after {
-  content: '';
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 18px;
-  height: 18px;
-  background: #fff;
-  border-radius: 50%;
-  transition: transform 0.2s;
-}
-
-.toggle-switch input:checked + .toggle-slider {
-  background: #1a73e8;
-}
-
-.toggle-switch input:checked + .toggle-slider::after {
-  transform: translateX(18px);
-}
-
-.toggle-text {
-  font-size: 13px;
-  color: #5f6368;
-}
-
-.modal-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 12px;
-  margin-top: 24px;
-}
-
-.btn-cancel {
-  padding: 10px 24px;
-  border: 1px solid #dadce0;
-  background: #fff;
-  color: #5f6368;
-  border-radius: 8px;
-  font-size: 14px;
-  cursor: pointer;
-  transition: background 0.15s ease;
-}
-.btn-cancel:hover {
-  background: #f8f9fa;
-}
-
-.btn-create {
-  padding: 10px 28px;
-  border: none;
-  background: #1a73e8;
-  color: #fff;
-  border-radius: 8px;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background 0.15s ease;
-}
-.btn-create:hover:not(:disabled) {
-  background: #1557b0;
-}
-.btn-create:disabled {
-  background: #a8c7fa;
-  cursor: not-allowed;
-}
-
-/* 弹窗过渡动画 */
-.modal-enter-active {
-  transition: opacity 0.25s ease;
-}
-.modal-enter-active .modal-box {
-  transition: transform 0.3s ease, opacity 0.25s ease;
-}
-.modal-leave-active {
-  transition: opacity 0.2s ease;
-}
-.modal-leave-active .modal-box {
-  transition: transform 0.2s ease, opacity 0.15s ease;
-}
-.modal-enter-from {
-  opacity: 0;
-}
-.modal-enter-from .modal-box {
-  transform: translateY(20px) scale(0.96);
-  opacity: 0;
-}
-.modal-leave-to {
-  opacity: 0;
-}
-.modal-leave-to .modal-box {
-  transform: translateY(10px) scale(0.97);
-  opacity: 0;
+@media (max-width: 760px) {
+  .sw-layout { grid-template-columns: 1fr; }
+  .sw-right { position: static; }
 }
 </style>

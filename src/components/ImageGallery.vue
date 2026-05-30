@@ -31,6 +31,7 @@ const hasMultiple = computed(() => props.images.length >= 2)
   <div class="gallery">
     <div class="gallery-main" @mouseenter="hoverPrev = true; hoverNext = true" @mouseleave="hoverPrev = false; hoverNext = false">
       <img
+        :key="currentIndex"
         :src="images[currentIndex]"
         :alt="alt || ''"
         class="gallery-img"

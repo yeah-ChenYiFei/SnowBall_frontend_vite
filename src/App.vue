@@ -48,7 +48,7 @@ onUnmounted(() => {
 })
 
 const wildSubItems = [
-  { label: '广场', path: '/', desc: '零散想法与帖子' },
+  { label: '广场', path: '/plaza', desc: '零散想法与帖子' },
   { label: '接龙', path: '/wild/chains', desc: '公共故事接龙' },
   { label: '大世界', path: '/wild/worlds', desc: '公开世界设定' },
   { label: '文阁', path: '/wild/library', desc: '已发布的小说散文' },
@@ -56,8 +56,8 @@ const wildSubItems = [
 
 const createSubItems = [
   { label: '设定编写', path: '/create/setting', desc: '世界观与角色设定' },
-  { label: '灵感记录', path: '/create/inspiration', desc: '捕捉创作灵感' },
-  { label: '创作中心', path: '/writing', desc: '写作工作台' },
+  { label: '小说编写', path: '/writing/novel/new', desc: '小说创作工坊' },
+  { label: '闲言碎语', path: '/writing', desc: '日常写作与灵感' },
 ]
 
 function openWildMenu() {
@@ -126,6 +126,35 @@ function handleLogout() {
 
       <!-- 主导航 -->
       <nav class="main-nav">
+        <template v-if="userStore.isLogin()">
+          <router-link
+            to="/"
+            class="nav-dropdown nav-link nav-link-dropdown"
+            :class="{ 'is-active': showCreateMenu }"
+            @mouseenter="openCreateMenu"
+            @mouseleave="scheduleHide"
+          >
+            创作
+            <span class="arrow" :class="{ 'arrow-open': showCreateMenu }">▾</span>
+            <transition name="dropdown">
+              <div v-if="showCreateMenu" class="dropdown-panel"
+                   @mouseenter="openCreateMenu"
+                   @mouseleave="scheduleHide">
+                <router-link
+                  v-for="item in createSubItems"
+                  :key="item.path"
+                  :to="item.path"
+                  class="dropdown-item"
+                  @click="showCreateMenu = false"
+                >
+                  <span class="item-label">{{ item.label }}</span>
+                  <span class="item-desc">{{ item.desc }}</span>
+                </router-link>
+              </div>
+            </transition>
+          </router-link>
+        </template>
+
         <div
           v-if="route.path !== '/login' && route.path !== '/register'"
           class="nav-dropdown nav-link nav-link-dropdown"
@@ -158,31 +187,6 @@ function handleLogout() {
         </div>
 
         <template v-if="userStore.isLogin()">
-          <div
-            class="nav-dropdown nav-link nav-link-dropdown"
-            :class="{ 'is-active': showCreateMenu }"
-            @mouseenter="openCreateMenu"
-            @mouseleave="scheduleHide"
-          >
-            创作
-            <span class="arrow" :class="{ 'arrow-open': showCreateMenu }">▾</span>
-            <transition name="dropdown">
-              <div v-if="showCreateMenu" class="dropdown-panel"
-                   @mouseenter="openCreateMenu"
-                   @mouseleave="scheduleHide">
-                <router-link
-                  v-for="item in createSubItems"
-                  :key="item.path"
-                  :to="item.path"
-                  class="dropdown-item"
-                  @click="showCreateMenu = false"
-                >
-                  <span class="item-label">{{ item.label }}</span>
-                  <span class="item-desc">{{ item.desc }}</span>
-                </router-link>
-              </div>
-            </transition>
-          </div>
           <router-link to="/groups" class="nav-link">群组</router-link>
           <div
             class="nav-dropdown nav-link nav-link-dropdown"
@@ -426,7 +430,7 @@ function handleLogout() {
 /* 下拉菜单 */
 .nav-dropdown {
   position: relative;
-  cursor: default;
+  cursor: pointer;
   user-select: none;
   display: flex;
   align-items: center;
