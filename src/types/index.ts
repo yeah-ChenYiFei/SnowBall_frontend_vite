@@ -267,6 +267,8 @@ export interface WorldRelation {
   toEntryName: string
   direction: 'LEFT_ARROW' | 'RIGHT_ARROW' | 'BIDIRECTIONAL'
   description: string
+  entryIds?: number[]
+  entryNames?: string[]
   createdAt: string
 }
 
@@ -285,6 +287,7 @@ export interface GraphEdge {
   toId: number
   direction: string
   description: string
+  entryIds?: number[]
 }
 
 // 灵感记录

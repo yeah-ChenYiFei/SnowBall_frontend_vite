@@ -6,6 +6,8 @@ import { useUserStore } from '@/stores/user'
 import type { World, WorldEntry, WorldRelation, Collaborator, WorldChange, ArticleFull } from '@/types'
 import WorldCollaboratorModal from '@/components/WorldCollaboratorModal.vue'
 import ToggleSwitch from '@/components/ToggleSwitch.vue'
+import AiProgressBar from '@/components/AiProgressBar.vue'
+import RelationGraph from '@/views/create/RelationGraph.vue'
 
 /* ================================================================
    Constants
@@ -82,13 +84,6 @@ const editPickType = ref('')
 const editRelMsg = ref('')
 const editRelSaving = ref(false)
 
-// Graph
-const graphPan = ref({ x: 0, y: 0 })
-const graphScale = ref(1)
-const dragging = ref(false)
-const dragStart = ref({ x: 0, y: 0 })
-const hoveredEdge = ref<number | null>(null)
-
 // Collaborators
 const showCollab = ref(false)
 const collaborators = ref<Collaborator[]>([])
@@ -99,14 +94,22 @@ const changes = ref<WorldChange[]>([])
 // Bound articles
 const boundArticles = ref<ArticleFull[]>([])
 
-// AI stories
-interface AiStory { id: string; content: string; prompt: string; entryNames: string; createdAt: string }
-const aiStoryHistory = ref<AiStory[]>([])
-const showAiModal = ref(false)
+// World stories (AI + manual)
+interface WorldStory { id: string; title: string; content: string; source: 'ai' | 'manual'; prompt: string; entryNames: string; createdAt: string }
+const storyHistory = ref<WorldStory[]>([])
+const showStoryModal = ref(false)
+const storyTab = ref<'ai' | 'manual'>('manual')
+// AI tab
 const aiPrompt = ref('')
 const aiSelected = ref<number[]>([])
 const aiLoading = ref(false)
+	const aiProgressDone = ref(false)
 const aiResult = ref('')
+// Manual tab
+const manualTitle = ref('')
+const manualContent = ref('')
+// Expanded story cards
+const expandedStories = ref<Set<string>>(new Set())
 
 /* ================================================================
    Computed
@@ -127,35 +130,6 @@ const editFilteredEntries = computed(() => {
   if (editPickType.value) list = list.filter(e => e.type === editPickType.value)
   if (editPickSearch.value) list = list.filter(e => e.name.includes(editPickSearch.value))
   return list
-})
-
-// Graph nodes/edges
-const graphNodes = computed(() => {
-  const set = new Set<number>()
-  relations.value.forEach(r => { set.add(r.fromEntryId); set.add(r.toEntryId) })
-  const nodes = Array.from(set).map(id => {
-    const e = entries.value.find(x => x.id === id)
-    return { id, name: e?.name || '未知' }
-  })
-  const count = nodes.length
-  const radius = Math.max(100, count * 16)
-  const cx = 230, cy = 260
-  nodes.forEach((n, i) => {
-    const angle = (2 * Math.PI * i) / count - Math.PI / 2
-    n.x = cx + radius * Math.cos(angle)
-    n.y = cy + radius * Math.sin(angle)
-  })
-  return nodes
-})
-
-const graphEdges = computed(() => relations.value.map(r => ({
-  id: r.id, fromId: r.fromEntryId, toId: r.toEntryId, direction: r.direction, label: r.description,
-})))
-
-const nodeMap = computed(() => {
-  const m: Record<number, { x: number; y: number }> = {}
-  graphNodes.value.forEach(n => { m[n.id] = { x: n.x, y: n.y } })
-  return m
 })
 
 function getEntryName(id: number | null) {
@@ -368,15 +342,22 @@ async function rejectChange(id: number) {
 /* ================================================================
    AI Story
    ================================================================ */
-function loadAiHistory() {
-  try { const raw = localStorage.getItem(`ai_stories_${worldId}`); aiStoryHistory.value = raw ? JSON.parse(raw) : [] } catch { aiStoryHistory.value = [] }
+function loadStoryHistory() {
+  try { const raw = localStorage.getItem(`world_stories_${worldId}`); storyHistory.value = raw ? JSON.parse(raw) : [] } catch { storyHistory.value = [] }
 }
-function saveAiStory(story: AiStory) { aiStoryHistory.value.unshift(story); localStorage.setItem(`ai_stories_${worldId}`, JSON.stringify(aiStoryHistory.value)) }
-function deleteAiStory(id: string) { aiStoryHistory.value = aiStoryHistory.value.filter(s => s.id !== id); localStorage.setItem(`ai_stories_${worldId}`, JSON.stringify(aiStoryHistory.value)) }
+function saveStory(story: WorldStory) { storyHistory.value.unshift(story); localStorage.setItem(`world_stories_${worldId}`, JSON.stringify(storyHistory.value)) }
+function deleteStory(id: string) { storyHistory.value = storyHistory.value.filter(s => s.id !== id); localStorage.setItem(`world_stories_${worldId}`, JSON.stringify(storyHistory.value)) }
 function toggleAiEntry(id: number) { const i = aiSelected.value.indexOf(id); if (i >= 0) aiSelected.value.splice(i, 1); else aiSelected.value.push(id) }
+function toggleExpandStory(id: string) {
+  if (expandedStories.value.has(id)) expandedStories.value.delete(id)
+  else expandedStories.value.add(id)
+  // trigger reactivity
+  expandedStories.value = new Set(expandedStories.value)
+}
 
 async function handleAiGenerate() {
   aiLoading.value = true; aiResult.value = ''
+		aiProgressDone.value = false
   try {
     const res = await http.post('/ai/world-story', {
       worldId, entryIds: aiSelected.value.length > 0 ? aiSelected.value : undefined,
@@ -384,28 +365,41 @@ async function handleAiGenerate() {
     }, { timeout: 120000 })
     aiResult.value = (res.data as any).continuation
     const names = entries.value.filter(e => aiSelected.value.includes(e.id)).map(e => e.name).join('、')
-    saveAiStory({ id: Date.now().toString(), content: aiResult.value, prompt: aiPrompt.value, entryNames: names || '全部设定', createdAt: new Date().toISOString() })
+    saveStory({ id: Date.now().toString(), title: 'AI 故事', content: aiResult.value, source: 'ai', prompt: aiPrompt.value, entryNames: names || '全部设定', createdAt: new Date().toISOString() })
   } catch (e: any) { alert('AI创作失败: ' + (e.message || '未知错误')) }
-  finally { aiLoading.value = false }
+		finally { aiLoading.value = false; aiProgressDone.value = true }
 }
 
-/* ================================================================
-   Graph interactions
-   ================================================================ */
-function onGraphMouseDown(e: MouseEvent) {
-  const t = e.target as SVGElement
-  if (t.classList.contains('graph-bg')) { dragging.value = true; dragStart.value = { x: e.clientX - graphPan.value.x, y: e.clientY - graphPan.value.y } }
+function handleSaveManual() {
+  if (!manualContent.value.trim()) return
+  saveStory({
+    id: Date.now().toString(),
+    title: manualTitle.value.trim() || '故事',
+    content: manualContent.value.trim(),
+    source: 'manual',
+    prompt: '',
+    entryNames: '',
+    createdAt: new Date().toISOString(),
+  })
+  manualTitle.value = ''
+  manualContent.value = ''
+  storyTab.value = 'manual'
+  showStoryModal.value = false
 }
-function onGraphMouseMove(e: MouseEvent) { if (!dragging.value) return; graphPan.value = { x: e.clientX - dragStart.value.x, y: e.clientY - dragStart.value.y } }
-function onGraphMouseUp() { dragging.value = false }
-function onGraphWheel(e: WheelEvent) { e.preventDefault(); graphScale.value = Math.max(0.3, Math.min(2, graphScale.value - e.deltaY * 0.001)) }
+
+function openStoryModal() {
+  aiResult.value = ''; aiSelected.value = []
+  manualTitle.value = ''; manualContent.value = ''
+  storyTab.value = 'manual'
+  showStoryModal.value = true
+}
 
 /* ================================================================
    Lifecycle
    ================================================================ */
 onMounted(() => {
   loadWorld(); loadEntries(); loadTypes(); loadRelations()
-  loadCollaborators(); loadChanges(); loadBoundArticles(); loadAiHistory()
+  loadCollaborators(); loadChanges(); loadBoundArticles(); loadStoryHistory()
 })
 </script>
 
@@ -528,78 +522,47 @@ onMounted(() => {
         </transition>
       </teleport>
 
-      <!-- Relations section -->
+      <!-- World Stories section -->
       <div class="wd-section">
         <div class="wd-section-header">
-          <h3>关系列表</h3>
-          <button class="wd-btn-secondary" @click="openRelModal">+ 管理关系</button>
+          <h3>📖 设定故事</h3>
+          <button class="wd-btn-accent" @click="openStoryModal">+ 写故事</button>
         </div>
-        <div v-if="relations.length === 0" class="wd-empty sm">暂无关系</div>
-        <div v-else class="rel-strip">
-          <div v-for="r in relations" :key="r.id" class="rel-chip" @click="openEditRel(r)">
-            <span>{{ r.fromEntryName }}</span>
-            <span class="rel-arrow-sm">{{ directionLabel[r.direction] }}</span>
-            <span>{{ r.toEntryName }}</span>
-            <span class="rel-desc-sm">{{ r.description }}</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- AI Story section -->
-      <div class="wd-section">
-        <div class="wd-section-header">
-          <h3>🤖 AI 创作故事</h3>
-          <button class="wd-btn-accent" @click="showAiModal = true; aiResult = ''; aiSelected = []">✨ 创作</button>
-        </div>
-        <div v-if="aiStoryHistory.length === 0" class="wd-empty sm">AI 可根据设定自动生成故事片段</div>
-        <div v-else class="ai-hist-list">
-          <div v-for="s in aiStoryHistory.slice(0, 3)" :key="s.id" class="ai-hist-item">
-            <div class="ai-hist-head">
-              <span class="ai-hist-badge">AI</span>
-              <span class="ai-hist-entries">{{ s.entryNames }}</span>
-              <span class="ai-hist-time">{{ new Date(s.createdAt).toLocaleString('zh-CN') }}</span>
-              <button class="ai-hist-del" @click="deleteAiStory(s.id)">×</button>
+        <div v-if="storyHistory.length === 0" class="wd-empty sm">在设定基础上创作故事片段</div>
+        <div v-else class="story-list">
+          <div
+            v-for="s in storyHistory"
+            :key="s.id"
+            :class="['story-card', { expanded: expandedStories.has(s.id) }]"
+            @click="toggleExpandStory(s.id)"
+          >
+            <div class="story-card-head">
+              <span :class="['story-badge', s.source]">{{ s.source === 'ai' ? 'AI' : '写' }}</span>
+              <span class="story-title">{{ s.title }}</span>
+              <span v-if="s.entryNames" class="story-entries">{{ s.entryNames }}</span>
+              <span class="story-time">{{ new Date(s.createdAt).toLocaleString('zh-CN') }}</span>
+              <button class="story-del" @click.stop="deleteStory(s.id)">×</button>
             </div>
-            <div class="ai-hist-preview">{{ s.content?.substring(0, 120) }}...</div>
+            <div v-if="!expandedStories.has(s.id)" class="story-preview">{{ s.content?.substring(0, 120) }}...</div>
+            <div v-else class="story-full">{{ s.content }}</div>
           </div>
         </div>
       </div>
     </div>
 
     <!-- ===================================================================================================
-         TAB: GRAPH
+         TAB: GRAPH (now a separate page)
          =================================================================================================== -->
     <div v-if="activeTab === 'graph'" class="wd-graph-tab">
-      <div v-if="relations.length === 0" class="wd-empty">暂无关系数据</div>
-      <div v-else class="graph-container" ref="graphContainer">
-        <svg class="graph-svg" viewBox="0 0 460 520"
-             @mousedown="onGraphMouseDown" @mousemove="onGraphMouseMove"
-             @mouseup="onGraphMouseUp" @mouseleave="onGraphMouseUp" @wheel="onGraphWheel">
-          <rect class="graph-bg" x="0" y="0" width="460" height="520" fill="transparent" />
-          <g :transform="`translate(${graphPan.x},${graphPan.y}) scale(${graphScale})`">
-            <g v-for="edge in graphEdges" :key="'e'+edge.id" style="cursor:pointer"
-               @click.stop="openEditRel(relations.find(r => r.id === edge.id)!)">
-              <line v-if="nodeMap[edge.fromId] && nodeMap[edge.toId]"
-                    :x1="nodeMap[edge.fromId].x" :y1="nodeMap[edge.fromId].y"
-                    :x2="nodeMap[edge.toId].x" :y2="nodeMap[edge.toId].y"
-                    :class="['graph-edge', 'edge-'+edge.direction, { hov: hoveredEdge === edge.id }]"
-                    @mouseenter="hoveredEdge = edge.id" @mouseleave="hoveredEdge = null" />
-              <text v-if="nodeMap[edge.fromId] && nodeMap[edge.toId]"
-                    :x="(nodeMap[edge.fromId].x + nodeMap[edge.toId].x)/2"
-                    :y="(nodeMap[edge.fromId].y + nodeMap[edge.toId].y)/2 - 8"
-                    :class="['edge-label', { hov: hoveredEdge === edge.id }]"
-                    text-anchor="middle"
-                    @mouseenter="hoveredEdge = edge.id" @mouseleave="hoveredEdge = null">{{ edge.label }}</text>
-            </g>
-            <g v-for="node in graphNodes" :key="'n'+node.id" class="graph-node-g"
-               @click="router.push(`/create/setting/${worldId}/entry/${node.id}`)">
-              <circle :cx="node.x" :cy="node.y" r="20" class="graph-node" />
-              <text :x="node.x" :y="node.y + 5" class="graph-node-text" text-anchor="middle">{{ node.name.length > 3 ? node.name.slice(0,3)+'..' : node.name }}</text>
-              <text :x="node.x" :y="node.y + 34" class="graph-node-label" text-anchor="middle">{{ node.name }}</text>
-            </g>
-          </g>
-        </svg>
-      </div>
+      <RelationGraph
+        :world-id="worldId"
+        :world="world"
+        :entries="entries"
+        :relations="relations"
+        :is-world-creator="isWorldCreator"
+        :all-types="allTypes"
+        @relations-changed="loadRelations"
+      />
     </div>
 
     <!-- ===================================================================================================
@@ -843,34 +806,61 @@ onMounted(() => {
       </transition>
     </teleport>
 
-    <!-- AI Story modal -->
+    <!-- Story modal -->
     <teleport to="body">
       <transition name="modal">
-        <div v-if="showAiModal" class="modal-overlay" @click.self="showAiModal = false">
-          <div class="modal-box ai-modal">
-            <h2>🤖 AI 创作故事</h2>
-            <template v-if="!aiResult">
-              <p class="ai-desc">选择设定条目让 AI 根据它们创作故事片段</p>
-              <div class="ai-select-entries">
-                <div v-for="e in entries" :key="e.id" :class="['ai-chip', { sel: aiSelected.includes(e.id) }]" @click="toggleAiEntry(e.id)">
-                  {{ e.name }} <span class="ai-chip-type">{{ e.type }}</span>
-                </div>
+        <div v-if="showStoryModal" class="modal-overlay" @click.self="showStoryModal = false">
+          <div class="modal-box story-modal">
+            <div class="modal-header"><h2>📖 设定故事</h2><button class="btn-close" @click="showStoryModal = false">✕</button></div>
+
+            <!-- Tabs -->
+            <div class="story-tabs">
+              <button :class="['story-tab', { active: storyTab === 'manual' }]" @click="storyTab = 'manual'">✍️ 自由写作</button>
+              <button :class="['story-tab', { active: storyTab === 'ai' }]" @click="storyTab = 'ai'">🤖 AI 创作</button>
+            </div>
+
+            <!-- Manual tab -->
+            <template v-if="storyTab === 'manual'">
+              <div class="form-row">
+                <label>标题</label>
+                <input v-model="manualTitle" class="form-input" placeholder="故事标题（选填）" />
               </div>
-              <div class="form-row" style="margin-top:16px">
-                <label>提示词（可选）</label>
-                <textarea v-model="aiPrompt" class="form-input form-textarea" rows="3" placeholder="描述想要的故事情节..."></textarea>
+              <div class="form-row">
+                <label>内容</label>
+                <textarea v-model="manualContent" class="form-input form-textarea" rows="12" placeholder="编写你的故事..."></textarea>
               </div>
               <div class="modal-actions">
-                <button class="btn-cancel" @click="showAiModal = false">取消</button>
-                <button class="wd-btn-accent" @click="handleAiGenerate" :disabled="aiLoading">{{ aiLoading ? '创作中...' : '✨ 开始创作' }}</button>
+                <button class="btn-cancel" @click="showStoryModal = false">取消</button>
+                <button class="wd-btn-primary" @click="handleSaveManual" :disabled="!manualContent.trim()">保存</button>
               </div>
             </template>
-            <template v-else>
-              <div class="ai-result"><p v-for="(line, i) in aiResult.split('\n')" :key="i">{{ line }}</p></div>
-              <div class="modal-actions">
-                <button class="btn-cancel" @click="handleAiGenerate">🔄 重新创作</button>
-                <button class="wd-btn-primary" @click="showAiModal = false">关闭</button>
-              </div>
+
+            <!-- AI tab -->
+            <template v-if="storyTab === 'ai'">
+              <template v-if="!aiResult">
+                <p class="ai-desc">选择设定条目让 AI 根据它们创作故事片段</p>
+                <div class="ai-select-entries">
+                  <div v-for="e in entries" :key="e.id" :class="['ai-chip', { sel: aiSelected.includes(e.id) }]" @click="toggleAiEntry(e.id)">
+                    {{ e.name }} <span class="ai-chip-type">{{ e.type }}</span>
+                  </div>
+                </div>
+                <div class="form-row" style="margin-top:16px">
+                  <label>提示词（可选）</label>
+                  <textarea v-model="aiPrompt" class="form-input form-textarea" rows="2" placeholder="描述想要的故事情节（一段即可）..."></textarea>
+                </div>
+                <AiProgressBar :running="aiLoading" :done="aiProgressDone" />
+                <div class="modal-actions">
+                  <button class="btn-cancel" @click="storyTab = 'manual'">返回</button>
+                  <button class="wd-btn-accent" @click="handleAiGenerate" :disabled="aiLoading">{{ aiLoading ? '创作中...' : '🤖 开始创作' }}</button>
+                </div>
+              </template>
+              <template v-else>
+                <textarea ref="aiResultRef" readonly class="ai-result-textarea" :value="aiResult" />
+                <div class="modal-actions">
+                  <button class="btn-cancel" @click="handleAiGenerate">🔄 重新创作</button>
+                  <button class="wd-btn-primary" @click="showStoryModal = false">关闭</button>
+                </div>
+              </template>
             </template>
           </div>
         </div>
@@ -971,18 +961,24 @@ onMounted(() => {
 .rel-arrow-sm { font-weight: 700; color: #1a73e8; }
 .rel-desc-sm { color: #999; margin-left: 4px; }
 
-/* AI history */
-.ai-hist-list { display: flex; flex-direction: column; gap: 8px; }
-.ai-hist-item { background: #f8f9fa; border-radius: 8px; padding: 10px 14px; border: 1px solid #f1f3f4; }
-.ai-hist-head { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
-.ai-hist-badge { font-size: 10px; padding: 1px 6px; background: linear-gradient(135deg, #667eea, #764ba2); color: #fff; border-radius: 6px; font-weight: 600; }
-.ai-hist-entries { font-size: 12px; color: #5f6368; }
-.ai-hist-time { font-size: 11px; color: #999; margin-left: auto; }
-.ai-hist-del { background: none; border: none; color: #d93025; cursor: pointer; font-size: 14px; }
-.ai-hist-preview { font-size: 13px; color: #333; line-height: 1.5; }
+/* Story list */
+.story-list { display: flex; flex-direction: column; gap: 8px; }
+.story-card { background: #fff; border: 1px solid #e8eaed; border-radius: 10px; padding: 12px 16px; cursor: pointer; transition: all 0.15s; }
+.story-card:hover { border-color: #1a73e8; box-shadow: 0 2px 8px rgba(26,115,232,0.08); }
+.story-card.expanded { border-color: #5b9bd5; background: #fafcff; }
+.story-card-head { display: flex; align-items: center; gap: 8px; }
+.story-badge { font-size: 10px; padding: 1px 7px; border-radius: 6px; font-weight: 600; color: #fff; }
+.story-badge.ai { background: linear-gradient(135deg, #667eea, #764ba2); }
+.story-badge.manual { background: linear-gradient(135deg, #43a047, #1b5e20); }
+.story-title { font-size: 13px; font-weight: 600; color: #202124; }
+.story-entries { font-size: 11px; color: #1a73e8; background: rgba(26,115,232,0.08); padding: 1px 6px; border-radius: 6px; }
+.story-time { font-size: 11px; color: #999; margin-left: auto; }
+.story-del { background: none; border: none; color: #d93025; cursor: pointer; font-size: 14px; padding: 0 2px; }
+.story-preview { font-size: 13px; color: #5f6368; line-height: 1.5; margin-top: 6px; }
+.story-full { font-size: 14px; color: #333; line-height: 1.8; margin-top: 8px; padding-top: 8px; border-top: 1px solid #e8f0fe; white-space: pre-wrap; max-height: 500px; overflow-y: auto; }
 
 /* ===== GRAPH TAB ===== */
-.wd-graph-tab { }
+.wd-graph-tab { height: calc(100vh - 250px); min-height: 400px; }
 .graph-container { background: #fff; border: 1px solid #e8eaed; border-radius: 12px; overflow: hidden; cursor: grab; }
 .graph-container:active { cursor: grabbing; }
 .graph-svg { width: 100%; height: auto; display: block; }
@@ -1089,8 +1085,11 @@ onMounted(() => {
 .picker-item:hover { background: #e8f0fe; }
 .picker-type { font-size: 11px; color: #1a73e8; background: rgba(26,115,232,0.08); padding: 1px 6px; border-radius: 8px; }
 
-/* AI modal */
-.ai-modal { width: 560px; }
+/* Story modal */
+.story-modal { width: 620px; }
+.story-tabs { display: flex; gap: 4px; margin-bottom: 18px; background: #f1f3f4; border-radius: 10px; padding: 4px; }
+.story-tab { flex: 1; padding: 10px 16px; border: none; background: transparent; border-radius: 8px; font-size: 14px; font-weight: 500; color: #5f6368; cursor: pointer; font-family: inherit; transition: all 0.2s; }
+.story-tab.active { background: #fff; color: #1a73e8; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
 .ai-desc { font-size: 14px; color: #5f6368; margin: 0 0 14px 0; }
 .ai-select-entries { display: flex; flex-wrap: wrap; gap: 6px; max-height: 140px; overflow-y: auto; padding: 2px; }
 .ai-chip { display: flex; align-items: center; gap: 4px; padding: 5px 10px; background: #f1f3f4; border: 2px solid #e8eaed; border-radius: 14px; cursor: pointer; font-size: 13px; transition: all 0.15s; }
@@ -1099,6 +1098,8 @@ onMounted(() => {
 .ai-chip-type { font-size: 10px; color: #999; }
 .ai-result { max-height: 400px; overflow-y: auto; background: #f8f9fa; border-radius: 8px; padding: 14px; font-size: 15px; line-height: 1.8; color: #333; }
 .ai-result p { margin: 0 0 10px 0; }
+.ai-result-textarea { display: block; width: 100%; min-height: 300px; max-height: 500px; padding: 14px; font-size: 15px; line-height: 1.8; color: #333; background: #f8f9fa; border: 1px solid #dadce0; border-radius: 8px; resize: vertical; outline: none; font-family: inherit; box-sizing: border-box; }
+.ai-result-textarea:focus { border-color: #1a73e8; }
 
 /* ===== ANIMATIONS ===== */
 .modal-enter-active { transition: opacity 0.25s; }

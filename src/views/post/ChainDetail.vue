@@ -2,6 +2,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import AiProgressBar from '@/components/AiProgressBar.vue'
 import http from '@/api/http'
 import { useUserStore } from '@/stores/user'
 
@@ -37,6 +38,7 @@ const isSubmitting = ref(false)
 const showAiPrompt = ref(false)
 const aiPrompt = ref('')
 const aiLoading = ref(false)
+	const aiProgressDone = ref(false)
 const isAiContent = ref(false)
 
 const sortedSegments = computed(() => {
@@ -96,6 +98,7 @@ const handleAiContinue = async () => {
     return
   }
   aiLoading.value = true
+		aiProgressDone.value = false
   try {
     const res = await http.post('/ai/chain-continue', {
       chainId,
@@ -108,6 +111,7 @@ const handleAiContinue = async () => {
     alert('AI续写失败: ' + (e.message || '未知错误'))
   } finally {
     aiLoading.value = false
+    aiProgressDone.value = true
   }
 }
 
@@ -190,6 +194,7 @@ onMounted(() => {
                 rows="6"
                 placeholder="描述你想要的情节走向、人物发展、文风..."
               ></textarea>
+				<AiProgressBar :running="aiLoading" :done="aiProgressDone" :duration="35" />
               <div class="ai-side-actions">
                 <button class="btn-ai-generate-sm" @click="handleAiContinue" :disabled="aiLoading">
                   {{ aiLoading ? '生成中...' : '生成续写' }}

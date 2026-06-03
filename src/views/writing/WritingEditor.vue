@@ -3,6 +3,7 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import http from '@/api/http'
 import type { ArticleType, World } from '@/types'
+import AiProgressBar from '@/components/AiProgressBar.vue'
 import { ArticleTypeLabel } from '@/types'
 import {
   type SectionType,
@@ -71,6 +72,7 @@ const fontFamily = ref('default')
 // AI continuation
 const aiOutput = ref('')
 const aiLoading = ref(false)
+	const aiProgressDone = ref(false)
 const aiPrompt = ref('')
 
 async function handleAiContinue() {
@@ -79,6 +81,7 @@ async function handleAiContinue() {
     return
   }
   aiLoading.value = true
+		aiProgressDone.value = false
   aiOutput.value = ''
   try {
     const payload: any = {
@@ -93,6 +96,7 @@ async function handleAiContinue() {
     aiOutput.value = 'AI续写失败: ' + (e.message || '未知错误')
   } finally {
     aiLoading.value = false
+    aiProgressDone.value = true
   }
 }
 
@@ -916,7 +920,10 @@ const textareaStyle = computed(() => ({
                 ></textarea>
               </div>
               <div class="ai-output" :class="{ loading: aiLoading }">
-                <span v-if="aiLoading" class="ai-loading-text">AI 正在续写中...</span>
+                <template v-if="aiLoading">
+                  <span class="ai-loading-text">AI 正在续写中...</span>
+                  <AiProgressBar :running="aiLoading" :done="aiProgressDone" :duration="65" />
+                </template>
                 <span v-else-if="!aiOutput" class="ai-placeholder">点击下方按钮，AI 将根据绑定的世界设定和已有小说内容进行续写</span>
                 <span v-else>{{ aiOutput }}</span>
               </div>
@@ -1563,7 +1570,6 @@ const textareaStyle = computed(() => ({
   align-items: center;
   justify-content: center;
 }
-
 .ai-loading-text {
   color: #1a73e8;
   font-size: 14px;

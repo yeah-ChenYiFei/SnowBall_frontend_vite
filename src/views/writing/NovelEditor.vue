@@ -2,6 +2,7 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import http from '@/api/http'
+import AiProgressBar from '@/components/AiProgressBar.vue'
 import type { World } from '@/types'
 import { toChineseNum } from '@/utils/chapterCodec'
 
@@ -52,6 +53,7 @@ const lineHeight = ref('1.8')
 
 // AI
 const aiOutput = ref(''); const aiLoading = ref(false); const aiPrompt = ref('')
+	const aiProgressDone = ref(false)
 
 // Submit
 const isSubmitting = ref(false); const message = ref('')
@@ -228,8 +230,9 @@ function moveSection(idx: number, dir: -1 | 1) {
 async function handleAi() {
   if (!novelId.value) { message.value = '请先保存章节'; return }
   aiLoading.value = true; aiOutput.value = ''
+		aiProgressDone.value = false
   try { const r = await http.post('/ai/continue', { novelId: novelId.value, currentBody: chapterBody.value, prompt: aiPrompt.value.trim() || undefined }, { timeout: 120000 }); aiOutput.value = (r.data as any).continuation } catch (e: any) { aiOutput.value = '失败: ' + (e.message || '错误') }
-  finally { aiLoading.value = false }
+  finally { aiLoading.value = false; aiProgressDone.value = true }
 }
 function copyAi() { if (!aiOutput.value) return; chapterBody.value = chapterBody.value ? chapterBody.value + '\n\n' + aiOutput.value : aiOutput.value; aiOutput.value = ''; aiPrompt.value = ''; isDirty.value = true; message.value = '已追加'; setTimeout(() => { message.value = '' }, 2000) }
 async function togglePub() { if (!novelId.value) return; const ep = isPublished.value ? `/novels/${novelId.value}/unpublish` : `/novels/${novelId.value}/publish`; const r = await http.post(ep); isPublished.value = (r.data as any).isPublished }
@@ -359,6 +362,7 @@ onMounted(async () => { await loadWorlds(); if (editId.value) await loadNovel(ed
           <h3>🤖 AI 续写</h3>
           <textarea v-model="aiPrompt" class="ne-ai-prompt" rows="2" placeholder="提示词（可选）..."></textarea>
           <div :class="['ne-ai-out', { loading: aiLoading }]">{{ aiLoading ? '续写中...' : aiOutput || 'AI 根据已有内容续写' }}</div>
+				<AiProgressBar :running="aiLoading" :done="aiProgressDone" :duration="65" />
           <div class="ne-ai-row">
             <button class="ne-ai-btn" :disabled="aiLoading" @click="handleAi">{{ aiLoading ? '...' : 'AI 续写' }}</button>
             <button v-if="aiOutput && !aiLoading" class="ne-ai-copy" @click="copyAi">追加</button>
