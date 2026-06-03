@@ -6,7 +6,7 @@ import { useUserStore } from '@/stores/user'
 import { useFriendStore } from '@/stores/friend'
 import UserAvatar from '@/components/UserAvatar.vue'
 import ImageLightbox from '@/components/ImageLightbox.vue'
-import type { UserProfileFull, ContributionDay, RecentProject, BrowsingHistory, Activity, PublicChain, FriendshipStatus } from '@/types'
+import type { UserProfileFull, ContributionDay, RecentProject, BrowsingHistory, Activity, PublicChain, FriendshipStatus, Post } from '@/types'
 
 const route = useRoute()
 const router = useRouter()
@@ -16,6 +16,14 @@ const friendStore = useFriendStore()
 const profile = ref<UserProfileFull | null>(null)
 const isLoading = ref(true)
 const showAllProjects = ref(false)
+
+// Post management
+const showPostManager = ref(false)
+const userPosts = ref<Post[]>([])
+const loadingPosts = ref(false)
+const selectedPostIds = ref<Set<number>>(new Set())
+const deletingPosts = ref(false)
+const deleteMsg = ref('')
 const hoveredDay = ref<ContributionDay | null>(null)
 const hoverPos = ref({ x: 0, y: 0 })
 const editingSignature = ref(false)
@@ -178,6 +186,91 @@ async function handleAcceptFriend() {
   if (!friendStatus.value.friendshipId) return
   await friendStore.acceptRequest(friendStatus.value.friendshipId)
   friendStatus.value = { status: 'FRIEND' }
+}
+
+// Post management
+async function openPostManager() {
+  showPostManager.value = true
+  selectedPostIds.value = new Set()
+  deleteMsg.value = ''
+  loadingPosts.value = true
+  try {
+    const res = await http.get('/posts/mine')
+    userPosts.value = res.data || []
+  } catch { userPosts.value = [] }
+  finally { loadingPosts.value = false }
+}
+
+function toggleSelectPost(id: number) {
+  const s = new Set(selectedPostIds.value)
+  if (s.has(id)) s.delete(id)
+  else s.add(id)
+  selectedPostIds.value = s
+}
+
+function toggleSelectAll() {
+  if (selectedPostIds.value.size === userPosts.value.length) {
+    selectedPostIds.value = new Set()
+  } else {
+    selectedPostIds.value = new Set(userPosts.value.map(p => p.id))
+  }
+}
+
+function editPost(id: number) {
+  showPostManager.value = false
+  router.push(`/post/${id}/edit`)
+}
+
+async function togglePostStatus(id: number) {
+  try {
+    const post = userPosts.value.find(p => p.id === id)
+    if (!post) return
+    const isHidden = post.status === 'HIDDEN'
+    const newStatus = isHidden ? 'PUBLISHED' : 'HIDDEN'
+    await http.post(`/posts/${id}/toggle-status`, { status: newStatus })
+    post.status = newStatus
+  } catch (e: any) { deleteMsg.value = e.message || '操作失败'; setTimeout(() => { deleteMsg.value = '' }, 2000) }
+}
+
+function isPostHidden(s: string | undefined) {
+  return s === 'HIDDEN'
+}
+
+async function batchAction(action: string) {
+  const ids = Array.from(selectedPostIds.value)
+  if (ids.length === 0) return
+  deletingPosts.value = true
+  deleteMsg.value = ''
+  try {
+    if (action === 'delete') {
+      if (!confirm(`确定要删除选中的 ${ids.length} 篇帖子吗？`)) { deletingPosts.value = false; return }
+      const res = await http.post('/posts/batch-delete', { ids })
+      deleteMsg.value = `已删除 ${(res.data as any).deleted || 0} 篇帖子`
+    } else {
+      const label = action === 'PUBLISHED' ? '公开' : '隐藏'
+      const res = await http.post('/posts/batch-toggle-status', { ids, status: action })
+      deleteMsg.value = `已将 ${(res.data as any).updated || 0} 篇帖子设为${label}`
+    }
+    selectedPostIds.value = new Set()
+    const reload = await http.get('/posts/mine')
+    userPosts.value = reload.data || []
+    if (profile.value && profile.value.stats) {
+      profile.value.stats.posts = userPosts.value.length
+    }
+  } catch (e: any) { deleteMsg.value = e.message || '操作失败' }
+  finally { deletingPosts.value = false }
+}
+
+async function batchDeletePosts() { batchAction('delete') }
+
+async function deleteSinglePost(id: number) {
+  selectedPostIds.value = new Set([id])
+  await batchAction('delete')
+}
+
+function statusLabel(s: string | undefined) {
+  if (s === 'HIDDEN') return '已隐藏'
+  return '公开'
 }
 
 function goToProject(p: RecentProject) {
@@ -343,7 +436,7 @@ watch(() => route.params.userId, loadProfile)
           </div>
 
           <div class="user-stats">
-            <div class="stat-item" @click="router.push('/')">
+            <div class="stat-item" :class="{ clickable: isSelf }" @click="isSelf ? openPostManager() : router.push('/')">
               <span class="stat-num">{{ profile.stats.posts }}</span>
               <span class="stat-label">帖子</span>
             </div>
@@ -515,6 +608,62 @@ watch(() => route.params.userId, loadProfile)
       <router-link to="/">返回广场</router-link>
     </div>
     <ImageLightbox :visible="showLightbox" :image-url="lightboxUrl" @close="showLightbox = false" />
+
+    <!-- Post Manager Modal -->
+    <teleport to="body">
+      <transition name="modal">
+        <div v-if="showPostManager" class="pm-overlay" @click.self="showPostManager = false">
+          <div class="pm-modal">
+            <div class="pm-header">
+              <h2>管理帖子</h2>
+              <button class="pm-close" @click="showPostManager = false">✕</button>
+            </div>
+            <div v-if="deleteMsg" :class="['pm-msg', { error: deleteMsg.includes('失败') }]">{{ deleteMsg }}</div>
+            <div v-if="loadingPosts" class="pm-loading">加载中...</div>
+            <template v-else>
+              <div class="pm-toolbar">
+                <label class="pm-select-all">
+                  <input type="checkbox" :checked="selectedPostIds.size === userPosts.length && userPosts.length > 0" @change="toggleSelectAll" />
+                  全选 ({{ selectedPostIds.size }}/{{ userPosts.length }})
+                </label>
+                <div class="pm-toolbar-right">
+                  <button class="pm-btn pm-btn-pub" :disabled="selectedPostIds.size === 0 || deletingPosts" @click="batchAction('PUBLISHED')">设为公开</button>
+                  <button class="pm-btn pm-btn-hide" :disabled="selectedPostIds.size === 0 || deletingPosts" @click="batchAction('HIDDEN')">设为隐藏</button>
+                  <button class="pm-btn pm-btn-del" :disabled="selectedPostIds.size === 0 || deletingPosts" @click="batchDeletePosts">
+                    {{ deletingPosts ? '操作中...' : `删除选中 (${selectedPostIds.size})` }}
+                  </button>
+                </div>
+              </div>
+              <div v-if="userPosts.length === 0" class="pm-empty">暂无帖子</div>
+              <div class="pm-list">
+                <div
+                  v-for="p in userPosts" :key="p.id"
+                  :class="['pm-item', { sel: selectedPostIds.has(p.id) }]"
+                >
+                  <input type="checkbox" :checked="selectedPostIds.has(p.id)" @click.stop @change="toggleSelectPost(p.id)" class="pm-checkbox" />
+                  <div class="pm-item-body">
+                    <div class="pm-item-head">
+                      <span class="pm-item-title">{{ p.title }}</span>
+                      <span :class="['pm-badge', { hidden: isPostHidden(p.status) }]">{{ isPostHidden(p.status) ? '已隐藏' : '公开' }}</span>
+                      <span class="pm-item-date">{{ new Date(p.createdAt).toLocaleDateString('zh-CN') }}</span>
+                    </div>
+                    <div class="pm-item-preview">{{ (p.body || '').substring(0, 120) }}</div>
+                    <div class="pm-item-actions">
+                      <button class="pm-row-btn" @click.stop="editPost(p.id)">✏️ 编辑</button>
+                      <button class="pm-row-btn" @click.stop="togglePostStatus(p.id)">
+                        {{ isPostHidden(p.status) ? '👁 设为公开' : '🙈 设为隐藏' }}
+                      </button>
+                      <button class="pm-row-btn del" @click.stop="deleteSinglePost(p.id)">🗑 删除</button>
+                      <button class="pm-row-btn" @click.stop="router.push(`/post/${p.id}`)">📄 查看</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </template>
+          </div>
+        </div>
+      </transition>
+    </teleport>
   </div>
 </template>
 
@@ -995,4 +1144,72 @@ watch(() => route.params.userId, loadProfile)
     grid-template-columns: 1fr;
   }
 }
+
+/* ===== Post Manager Modal ===== */
+.pm-overlay {
+  position: fixed; inset: 0; z-index: 3000;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0,0,0,0.3); backdrop-filter: blur(6px); padding: 24px;
+}
+.pm-modal {
+  background: #fff; border-radius: 16px; padding: 0;
+  width: 640px; max-width: 90vw; max-height: 80vh;
+  display: flex; flex-direction: column;
+  box-shadow: 0 16px 48px rgba(0,0,0,0.15); overflow: hidden;
+}
+.pm-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 24px 28px 16px; flex-shrink: 0;
+}
+.pm-header h2 { margin: 0; font-size: 20px; color: #202124; }
+.pm-close { background: none; border: none; font-size: 20px; color: #999; cursor: pointer; }
+.pm-close:hover { color: #202124; }
+.pm-msg { margin: 0 28px; padding: 8px 12px; background: #e6f4ea; color: #137333; border-radius: 6px; font-size: 13px; }
+.pm-msg.error { background: #fce8e6; color: #d93025; }
+.pm-loading { text-align: center; padding: 40px; color: #999; font-size: 14px; }
+.pm-empty { text-align: center; padding: 40px; color: #999; font-size: 14px; }
+
+.pm-toolbar {
+  display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;
+  padding: 12px 28px; border-bottom: 1px solid #e8eaed; flex-shrink: 0;
+}
+.pm-select-all { display: flex; align-items: center; gap: 8px; font-size: 14px; color: #5f6368; cursor: pointer; white-space: nowrap; }
+.pm-select-all input { width: 16px; height: 16px; cursor: pointer; accent-color: #1a73e8; }
+.pm-toolbar-right { display: flex; gap: 6px; flex-wrap: wrap; }
+.pm-btn {
+  padding: 7px 15px; border: none; border-radius: 8px; font-size: 13px;
+  font-weight: 500; cursor: pointer; font-family: inherit; white-space: nowrap;
+}
+.pm-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.pm-btn-pub { background: #e6f4ea; color: #137333; }
+.pm-btn-pub:hover:not(:disabled) { background: #ceead6; }
+.pm-btn-hide { background: #fef7e0; color: #b06000; }
+.pm-btn-hide:hover:not(:disabled) { background: #feefc3; }
+.pm-btn-del { background: #fce8e6; color: #c5221f; }
+.pm-btn-del:hover:not(:disabled) { background: #fad2cf; }
+
+.pm-list { flex: 1; overflow-y: auto; padding: 8px 20px 20px; }
+.pm-item {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 14px 16px; border-radius: 10px;
+  border: 1px solid #e8eaed; transition: all 0.15s; margin-bottom: 6px;
+}
+.pm-item:hover { background: #fafbff; border-color: #c4d7f2; }
+.pm-item.sel { background: #e8f0fe; border-color: #a8c7fa; }
+.pm-checkbox { width: 18px; height: 18px; margin-top: 2px; flex-shrink: 0; cursor: pointer; accent-color: #1a73e8; }
+.pm-item-body { flex: 1; min-width: 0; }
+.pm-item-head { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.pm-item-title { font-size: 15px; font-weight: 600; color: #202124; }
+.pm-badge { font-size: 10px; padding: 1px 6px; border-radius: 8px; background: #e6f4ea; color: #137333; flex-shrink: 0; }
+.pm-badge.hidden { background: #fef7e0; color: #b06000; }
+.pm-item-date { font-size: 12px; color: #999; flex-shrink: 0; margin-left: auto; }
+.pm-item-preview { font-size: 13px; color: #5f6368; line-height: 1.5; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-bottom: 6px; }
+.pm-item-actions { display: flex; gap: 6px; }
+.pm-row-btn {
+  padding: 4px 11px; border: 1px solid #dadce0; border-radius: 14px;
+  background: #fff; font-size: 12px; color: #5f6368; cursor: pointer;
+  font-family: inherit; transition: all 0.15s;
+}
+.pm-row-btn:hover { border-color: #1a73e8; color: #1a73e8; background: #e8f0fe; }
+.pm-row-btn.del:hover { border-color: #d93025; color: #d93025; background: #fce8e6; }
 </style>

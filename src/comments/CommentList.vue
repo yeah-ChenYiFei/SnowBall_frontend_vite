@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, onBeforeUnmount, computed } from 'vue'
 import http from '@/api/http'
 import { useUserStore } from '@/stores/user'
 import CommentItem from './CommentItem.vue'
@@ -15,6 +15,7 @@ const commentImageUrl = ref('')
 const lightboxUrl = ref('')
 const showLightbox = ref(false)
 const isLoading = ref(false)
+let pollTimer: ReturnType<typeof setInterval> | null = null
 
 // ✅ 核心状态：记录当前展开的小输入框是属于哪条评论的
 const activeReplyId = ref<number | null>(null)
@@ -41,6 +42,7 @@ const loadComments = async () => {
 const submitMainComment = async () => {
   if (!newComment.value.trim() && !commentImageUrl.value) return
   if (!userStore.isLogin()) return alert('请先登录')
+  isLoading.value = true
   try {
     const imgUrl = commentImageUrl.value
     await http.post(`/posts/${props.postId}/comments`, {
@@ -52,6 +54,7 @@ const submitMainComment = async () => {
     commentImageUrl.value = ''
     await loadComments()
   } catch (error: any) { alert(error.message || '评论失败') }
+  finally { isLoading.value = false }
 }
 
 function removeCommentImage() {
@@ -76,7 +79,16 @@ const handleSubmitReply = async (parentId: number, body: string, imageUrl?: stri
   } catch (error: any) { alert(error.message || '回复失败') }
 }
 
-onMounted(() => { loadComments() })
+onMounted(() => {
+  loadComments()
+  // Poll for new comments every 15s so users see others' comments without reloading
+  pollTimer = window.setInterval(loadComments, 15000)
+})
+
+onBeforeUnmount(() => {
+  if (pollTimer) clearInterval(pollTimer)
+})
+
 defineExpose({ loadComments })
 </script>
 
