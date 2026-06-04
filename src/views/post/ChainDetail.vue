@@ -24,6 +24,7 @@ interface Segment {
 interface ChainDetail {
   id: number
   title: string
+  creatorId?: number
   creatorName?: string
   createdAt: string
   segments?: Segment[]
@@ -131,7 +132,7 @@ onMounted(() => {
         <span class="type-badge chain-badge">📖 故事接龙</span>
         <h1 class="chain-title">{{ chainData?.title }}</h1>
         <p class="chain-meta">
-          发起人：{{ chainData?.creatorName || '匿名' }} · {{ new Date(chainData?.createdAt || '').toLocaleString() }}
+          发起人：<span v-if="chainData?.creatorId" class="clickable-author" @click="router.push(`/profile/${chainData.creatorId}`)">{{ chainData?.creatorName || '匿名' }}</span><span v-else>{{ chainData?.creatorName || '匿名' }}</span> · {{ new Date(chainData?.createdAt || '').toLocaleString() }}
         </p>
       </div>
 
@@ -151,7 +152,7 @@ onMounted(() => {
           <div class="segment-content">
             <div class="segment-header">
               <span class="seg-index">第 {{ index + 1 }} 段</span>
-              <span class="seg-author">👤 {{ seg?.username || '匿名' }}</span>
+              <span class="seg-author" @click="router.push(`/profile/${seg.userId}`)">👤 {{ seg?.username || '匿名' }}</span>
               <span v-if="seg?.isAiGenerated" class="ai-badge">🤖 AI续写</span>
               <span class="seg-time">{{ new Date(seg?.createdAt || '').toLocaleString() }}</span>
             </div>
@@ -247,7 +248,10 @@ onMounted(() => {
 
 .segment-header { display: flex; gap: 16px; align-items: center; margin-bottom: 12px; font-size: 13px; color: #999; border-bottom: 1px solid #f8f9fa; padding-bottom: 8px; }
 .seg-index { font-weight: 600; color: #1a73e8; }
-.seg-author { color: #333; font-weight: 500; }
+.seg-author { color: #333; font-weight: 500; cursor: pointer; transition: color 0.15s; }
+.seg-author:hover { color: #1a73e8; text-decoration: underline; }
+.clickable-author { cursor: pointer; color: #1a73e8; transition: color 0.15s; }
+.clickable-author:hover { text-decoration: underline; }
 .ai-badge { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #fff; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
 .seg-time { color: #999; margin-left: auto; }
 

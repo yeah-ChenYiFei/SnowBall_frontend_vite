@@ -27,6 +27,43 @@ const isLoadingMsgs = ref(false)
 const chatRef = ref<HTMLElement | null>(null)
 let pollTimer: ReturnType<typeof setInterval> | null = null
 
+// Pinned friends
+const pinnedFriendIds = ref<Set<number>>(new Set(JSON.parse(localStorage.getItem('pinned_friends') || '[]')))
+function savePinned() { localStorage.setItem('pinned_friends', JSON.stringify([...pinnedFriendIds.value])) }
+
+const sortedFriends = computed(() => {
+  const list = [...friendStore.friends]
+  list.sort((a, b) => {
+    const aPin = pinnedFriendIds.value.has(a.userId) ? 1 : 0
+    const bPin = pinnedFriendIds.value.has(b.userId) ? 1 : 0
+    if (aPin !== bPin) return bPin - aPin // pinned first
+    return 0
+  })
+  return list
+})
+
+// Right-click context menu on friend cards
+const friendContextMenu = ref({ show: false, x: 0, y: 0, friend: null as Friend | null })
+function onFriendContextMenu(e: MouseEvent, f: Friend) {
+  e.preventDefault()
+  friendContextMenu.value = { show: true, x: e.clientX, y: e.clientY, friend: f }
+}
+function closeFriendContextMenu() { friendContextMenu.value.show = false }
+
+function togglePinFriend(f: Friend) {
+  const s = new Set(pinnedFriendIds.value)
+  if (s.has(f.userId)) s.delete(f.userId)
+  else s.add(f.userId)
+  pinnedFriendIds.value = s
+  savePinned()
+  closeFriendContextMenu()
+}
+
+async function handleUnfriendFromMenu(f: Friend) {
+  closeFriendContextMenu()
+  await handleUnfriend(f)
+}
+
 function loadFriends() {
   friendStore.loadFriends()
   friendStore.loadPendingRequests()
@@ -48,17 +85,24 @@ const totalFriendUnread = computed(() => {
   return Object.values(friendUnreadMap.value).reduce((a, b) => a + b, 0)
 })
 
-async function loadMessages(friendId: number) {
-  isLoadingMsgs.value = true
+async function loadMessages(friendId: number, since?: number) {
+  if (!since) isLoadingMsgs.value = true
   try {
-    const res = await http.get(`/chat/${friendId}`)
-    messages.value = Array.isArray(res.data) ? res.data : (res.data?.messages || [])
+    const params: any = {}
+    if (since) params.since = since
+    const res = await http.get(`/chat/${friendId}`, { params })
+    const newMsgs = Array.isArray(res.data) ? res.data : (res.data?.messages || [])
+    if (since && newMsgs.length > 0) {
+      messages.value.push(...newMsgs)
+    } else if (!since) {
+      messages.value = newMsgs
+    }
     await nextTick()
-    scrollToBottom()
+    if (!since) scrollToBottom()
   } catch {
-    messages.value = []
+    if (!since) messages.value = []
   } finally {
-    isLoadingMsgs.value = false
+    if (!since) isLoadingMsgs.value = false
   }
 }
 
@@ -113,18 +157,42 @@ async function handleReject(friend: Friend) {
   loadFriends()
 }
 
-const formatTime = (iso: string) => {
+async function handleUnfriend(friend: Friend) {
+  if (!confirm(`确定要删除好友「${friend.username}」吗？此操作不可恢复。`)) return
+  try {
+    await friendStore.unfriend(friend.id!)
+    if (selectedFriend.value?.userId === friend.userId) {
+      selectedFriend.value = null
+      messages.value = []
+    }
+  } catch (e: any) {
+    alert(e.message || '删除失败')
+  }
+}
+
+function formatTime(iso: string): string {
   const d = new Date(iso)
-  return d.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+  const now = new Date()
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const yesterday = new Date(today.getTime() - 86400000)
+  const dayBefore = new Date(today.getTime() - 2 * 86400000)
+  const msgDay = new Date(d.getFullYear(), d.getMonth(), d.getDate())
+
+  const timeStr = d.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+  if (msgDay.getTime() === today.getTime()) return timeStr
+  if (msgDay.getTime() === yesterday.getTime()) return `昨天 ${timeStr}`
+  if (msgDay.getTime() === dayBefore.getTime()) return `前天 ${timeStr}`
+  return `${d.getMonth() + 1}月${d.getDate()}日 ${timeStr}`
 }
 
 onMounted(() => {
   loadFriends()
   pollTimer = setInterval(() => {
-    // Poll unread counts every 5s for real-time badge updates
     loadFriendUnreadCounts()
-    if (selectedFriend.value) {
-      loadMessages(selectedFriend.value.userId)
+    // Only poll new messages since last known ID to avoid flicker
+    if (selectedFriend.value && messages.value.length > 0) {
+      const lastId = messages.value[messages.value.length - 1].id
+      loadMessages(selectedFriend.value.userId, lastId)
     }
   }, 5000)
 })
@@ -156,11 +224,12 @@ onUnmounted(() => {
       <div v-if="tab === 'friends'" class="friends-list">
         <div v-if="friendStore.friends.length === 0" class="empty-hint">还没有好友</div>
         <div
-          v-for="f in friendStore.friends"
+          v-for="f in sortedFriends"
           :key="f.userId"
           class="friend-item"
           :class="{ 'friend-selected': selectedFriend?.userId === f.userId }"
           @click="selectFriend(f)"
+          @contextmenu="onFriendContextMenu($event, f)"
         >
           <UserAvatar
             :username="f.username"
@@ -169,11 +238,15 @@ onUnmounted(() => {
             class="friend-avatar-sm"
           />
           <div class="friend-item-info">
-            <span class="friend-name">{{ f.username }}</span>
+            <span class="friend-name">
+              <span v-if="pinnedFriendIds.has(f.userId)" class="pin-indicator" title="已置顶">📌</span>
+              {{ f.username }}
+            </span>
             <span class="friend-since">好友始于 {{ new Date(f.since).toLocaleDateString('zh-CN') }}</span>
           </div>
           <span v-if="friendUnreadMap[f.userId] > 0" class="friend-unread-badge">{{ friendUnreadMap[f.userId] > 99 ? '99+' : friendUnreadMap[f.userId] }}</span>
           <button class="btn-profile-sm" @click.stop="goToProfile(f.userId)" title="查看主页">👤</button>
+          <button v-if="f.id" class="btn-delete-friend" @click.stop="handleUnfriend(f)" title="删除好友">×</button>
         </div>
       </div>
 
@@ -256,6 +329,18 @@ onUnmounted(() => {
       </template>
     </div>
     <ImageLightbox :visible="showLightbox" :image-url="lightboxUrl" @close="showLightbox = false" />
+
+    <!-- Friend Context Menu -->
+    <Teleport to="body">
+      <div v-if="friendContextMenu.show" class="fcm-overlay" @click="closeFriendContextMenu">
+        <div class="fcm-menu" :style="{ left: friendContextMenu.x + 'px', top: friendContextMenu.y + 'px' }" @click.stop>
+          <div class="fcm-item" @click="friendContextMenu.friend && togglePinFriend(friendContextMenu.friend)">
+            {{ friendContextMenu.friend && pinnedFriendIds.has(friendContextMenu.friend.userId) ? '📌 取消置顶' : '📌 置顶' }}
+          </div>
+          <div class="fcm-item fcm-danger" @click="friendContextMenu.friend && handleUnfriendFromMenu(friendContextMenu.friend)">🗑 删除好友</div>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -331,6 +416,12 @@ onUnmounted(() => {
   cursor: pointer; font-size: 14px; padding: 4px 8px; flex-shrink: 0;
 }
 .btn-profile-sm:hover { background: #e8f0fe; border-color: #1a73e8; }
+.btn-delete-friend {
+  background: none; border: 1px solid transparent; border-radius: 4px;
+  cursor: pointer; font-size: 16px; color: #999; padding: 2px 6px;
+  flex-shrink: 0; transition: all 0.15s; line-height: 1;
+}
+.btn-delete-friend:hover { background: #fce8e6; color: #d93025; border-color: #f28b82; }
 
 .request-actions { display: flex; gap: 6px; flex-shrink: 0; }
 .btn-accept { padding: 4px 10px; background: #1a73e8; color: #fff; border: none; border-radius: 5px; cursor: pointer; font-size: 12px; }
@@ -386,4 +477,21 @@ onUnmounted(() => {
 .no-friend-selected { margin: auto; text-align: center; color: #999; }
 .no-select-icon { font-size: 48px; margin-bottom: 12px; }
 .no-friend-selected p { font-size: 14px; margin: 0; }
+
+/* Pin indicator */
+.pin-indicator { font-size: 11px; margin-right: 2px; }
+
+/* Friend Context Menu */
+.fcm-overlay { position: fixed; inset: 0; z-index: 4000; }
+.fcm-menu {
+  position: absolute; background: #fff; border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.15); padding: 4px 0;
+  min-width: 140px; border: 1px solid #e8eaed;
+}
+.fcm-item {
+  padding: 8px 16px; font-size: 13px; color: #202124; cursor: pointer;
+  transition: background 0.1s; font-family: inherit;
+}
+.fcm-item:hover { background: #f1f3f4; }
+.fcm-item.fcm-danger:hover { background: #fce8e6; color: #d93025; }
 </style>

@@ -52,6 +52,9 @@ import AdminUserList from '@/views/admin/UserList.vue'
 import AdminArticleList from '@/views/admin/ArticleList.vue'
 import AdminWorldList from '@/views/admin/WorldList.vue'
 import Favorites from '@/views/user/Favorites.vue'
+import ProfilePosts from '@/views/user/ProfilePosts.vue'
+import ProfileWorlds from '@/views/user/ProfileWorlds.vue'
+import ProfileArticles from '@/views/user/ProfileArticles.vue'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -76,6 +79,9 @@ const router = createRouter({
     { path: '/forgot-password', component: ForgotPassword },
     { path: '/settings', component: Settings, meta: { requiresAuth: true } },
     { path: '/profile/:userId', component: Profile },
+    { path: '/profile/:userId/posts', component: ProfilePosts },
+    { path: '/profile/:userId/worlds', component: ProfileWorlds },
+    { path: '/profile/:userId/articles', component: ProfileArticles },
     { path: '/mine', redirect: (to: any) => `/profile/${to.query.userId || 'self'}` },
     { path: '/books', component: BookManage, meta: { requiresAuth: true } },
     { path: '/friends', component: Friends, meta: { requiresAuth: true } },
@@ -131,6 +137,10 @@ function isPublicPath(path: string): boolean {
   // /post/:id 和 /chain/:id 也允许未登录查看
   if (/^\/post\/\d+$/.test(path)) return true
   if (/^\/chain\/\d+$/.test(path)) return true
+  // 其他用户公开内容页面
+  if (/^\/profile\/\d+\/posts$/.test(path)) return true
+  if (/^\/profile\/\d+\/worlds$/.test(path)) return true
+  if (/^\/profile\/\d+\/articles$/.test(path)) return true
   // 旷野公共接龙
   if (/^\/wild\/chains\/\d+$/.test(path)) return true
   if (path === '/wild/chains') return true

@@ -436,7 +436,18 @@ function goBack() { router.push('/groups') }
 
 
 function formatTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+  const d = new Date(iso)
+  const now = new Date()
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const yesterday = new Date(today.getTime() - 86400000)
+  const dayBefore = new Date(today.getTime() - 2 * 86400000)
+  const msgDay = new Date(d.getFullYear(), d.getMonth(), d.getDate())
+
+  const timeStr = d.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+  if (msgDay.getTime() === today.getTime()) return timeStr
+  if (msgDay.getTime() === yesterday.getTime()) return `昨天 ${timeStr}`
+  if (msgDay.getTime() === dayBefore.getTime()) return `前天 ${timeStr}`
+  return `${d.getMonth() + 1}月${d.getDate()}日 ${timeStr}`
 }
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString('zh-CN')

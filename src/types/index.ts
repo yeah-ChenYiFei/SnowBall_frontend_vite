@@ -404,11 +404,16 @@ export interface RecentProject {
 }
 
 export interface BrowsingHistory {
-  postId: number
-  postTitle: string
-  postType: string
+  entityId: number
+  entityTitle: string
+  entityType: string  // 'POST' | 'NOVEL' | 'CHAIN' | 'WORLD'
   authorName?: string
+  authorId?: number
   viewedAt: string
+  // Legacy fields for backward compat
+  postId?: number
+  postTitle?: string
+  postType?: string
 }
 
 export interface Activity {

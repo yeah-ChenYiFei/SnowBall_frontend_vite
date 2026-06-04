@@ -54,7 +54,7 @@ const visibleProjects = computed(() => {
 const typeLabel: Record<string, string> = {
   OC: '原创角色', SETTING: '世界观', FRAGMENT: '小说片段', BOOK_INFO: '书籍信息',
   ESSAY: '散文', DIARY: '日记', NOVEL: '小说', WORLD: '设定世界',
-  INSPIRATION: '灵感', POST: '帖子',
+  CHAIN: '公共接龙', INSPIRATION: '灵感', POST: '帖子',
 }
 
 async function loadProfile() {
@@ -93,7 +93,26 @@ async function loadProfile() {
     let browsingHistory: BrowsingHistory[] = []
     try {
       const stored = localStorage.getItem(`browseHistory_${id}`)
-      if (stored) browsingHistory = JSON.parse(stored) as BrowsingHistory[]
+      if (stored) {
+        let raw = JSON.parse(stored)
+        // Migrate old-format entries (postId → entityId)
+        raw = raw.map((h: any) => {
+          if (h.entityId !== undefined) return h as BrowsingHistory
+          return {
+            entityId: h.postId ?? h.entityId ?? 0,
+            entityTitle: h.postTitle ?? h.entityTitle ?? '',
+            entityType: h.postType ?? h.entityType ?? 'POST',
+            authorName: h.authorName,
+            authorId: h.authorId,
+            viewedAt: h.viewedAt ?? new Date().toISOString(),
+          } as BrowsingHistory
+        })
+        browsingHistory = raw as BrowsingHistory[]
+        // Save migrated data back
+        localStorage.setItem(`browseHistory_${id}`, JSON.stringify(browsingHistory))
+      }
+      // Filter out own content
+      browsingHistory = browsingHistory.filter(h => h.authorId !== Number(id))
       browsingHistory.sort((a, b) => new Date(b.viewedAt).getTime() - new Date(a.viewedAt).getTime())
     } catch { /* */ }
 
@@ -300,6 +319,16 @@ function goToPost(postId: number) {
   router.push(`/post/${postId}`)
 }
 
+function goToHistory(h: BrowsingHistory) {
+  switch (h.entityType) {
+    case 'POST': router.push(`/post/${h.entityId}`); break
+    case 'NOVEL': router.push(`/wild/library/novel/${h.entityId}`); break
+    case 'CHAIN': router.push(`/wild/chains/${h.entityId}`); break
+    case 'WORLD': router.push(`/wild/worlds/${h.entityId}`); break
+    default: router.push(`/post/${h.entityId}`); break
+  }
+}
+
 function goToActivity(a: Activity) {
   if (a.type === 'PUBLIC_CHAIN') router.push(`/wild/chains/${a.id}`)
   else if (a.type === 'CHAIN') router.push(`/chain/${a.id}`)
@@ -436,19 +465,23 @@ watch(() => route.params.userId, loadProfile)
           </div>
 
           <div class="user-stats">
-            <div class="stat-item" :class="{ clickable: isSelf }" @click="isSelf ? openPostManager() : router.push('/')">
+            <div class="stat-item" :class="{ clickable: isSelf }" @click="isSelf ? openPostManager() : router.push(`/profile/${userId}/posts`)">
               <span class="stat-num">{{ profile.stats.posts }}</span>
               <span class="stat-label">帖子</span>
             </div>
-            <div class="stat-item" @click="router.push('/create/setting')">
+            <div class="stat-item" :class="{ clickable: !isSelf }" @click="isSelf ? router.push('/create/setting') : router.push(`/profile/${userId}/worlds`)">
               <span class="stat-num">{{ profile.stats.worlds }}</span>
               <span class="stat-label">世界</span>
             </div>
-            <div class="stat-item" @click="router.push('/writing')">
+            <div class="stat-item" :class="{ clickable: !isSelf }" @click="isSelf ? router.push('/writing') : router.push(`/profile/${userId}/articles`)">
               <span class="stat-num">{{ profile.stats.articles }}</span>
               <span class="stat-label">文章</span>
             </div>
-            <div class="stat-item" @click="router.push('/create/inspiration')">
+            <div v-if="isSelf" class="stat-item clickable" @click="router.push('/create/inspiration')">
+              <span class="stat-num">{{ profile.stats.inspirations }}</span>
+              <span class="stat-label">灵感</span>
+            </div>
+            <div v-else class="stat-item" style="cursor: default">
               <span class="stat-num">{{ profile.stats.inspirations }}</span>
               <span class="stat-label">灵感</span>
             </div>
@@ -568,12 +601,12 @@ watch(() => route.params.userId, loadProfile)
             <ul v-else class="history-list">
               <li
                 v-for="h in profile.browsingHistory.slice(0, 5)"
-                :key="h.postId"
+                :key="`${h.entityType}-${h.entityId}`"
                 class="history-item"
-                @click="goToPost(h.postId)"
+                @click="goToHistory(h)"
               >
-                <span class="history-type-tag">{{ typeLabel[h.postType] || h.postType }}</span>
-                <span class="history-title">{{ h.postTitle }}</span>
+                <span class="history-type-tag">{{ typeLabel[h.entityType] || h.entityType }}</span>
+                <span class="history-title">{{ h.entityTitle }}</span>
                 <span class="history-time">{{ formatDate(h.viewedAt) }}</span>
               </li>
             </ul>

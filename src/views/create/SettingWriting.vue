@@ -45,6 +45,7 @@ function confirmNewType() {
 async function createWorld() {
   if (!form.value.name.trim()) { message.value = '请输入世界名称'; return }
   if (!form.value.type) { message.value = '请选择世界观类型'; return }
+  if (!form.value.description.trim()) { message.value = '请输入世界简介'; return }
   isSubmitting.value = true; message.value = ''
   try {
     const r = await http.post('/worlds', form.value)
@@ -151,7 +152,7 @@ onMounted(loadWorlds)
             </div>
           </div>
 
-          <button class="sw-btn-create" :disabled="isSubmitting || !form.name.trim() || !form.type"
+          <button class="sw-btn-create" :disabled="isSubmitting || !form.name.trim() || !form.type || !form.description.trim()"
                   @click="createWorld">
             {{ isSubmitting ? '创建中...' : '创建世界 ✨' }}
           </button>

@@ -83,7 +83,7 @@ onMounted(loadChains)
           <p v-if="chain.description" class="chain-card-desc">{{ chain.description }}</p>
           <p v-if="chain.firstSegmentBody" class="chain-card-preview">{{ chain.firstSegmentBody }}</p>
           <div class="chain-card-footer">
-            <span class="chain-author">👤 {{ chain.creatorName || '匿名' }}</span>
+            <span class="chain-author" @click.stop="router.push(`/profile/${chain.creatorId}`)">👤 {{ chain.creatorName || '匿名' }}</span>
             <div class="chain-meta">
               <span v-if="chain.deadline" class="chain-deadline">
                 ⏰ {{ formatDate(chain.deadline) }} 截止
@@ -214,7 +214,8 @@ onMounted(loadChains)
   display: flex; justify-content: space-between; align-items: center;
   font-size: 13px;
 }
-.chain-author { color: #5f6368; }
+.chain-author { color: #5f6368; cursor: pointer; transition: color 0.15s; }
+.chain-author:hover { color: #1a73e8; text-decoration: underline; }
 .chain-meta { display: flex; gap: 12px; }
 .chain-deadline { color: #e37400; }
 .chain-date { color: #999; }

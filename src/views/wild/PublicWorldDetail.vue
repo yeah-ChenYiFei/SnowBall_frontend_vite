@@ -35,6 +35,7 @@ const isLoadingComments = ref(false)
 
 const isOwner = computed(() => world.value?.userId === userStore.userInfo?.id)
 const isCollab = computed(() => world.value?.isCollaborator === true)
+const isFavorited = ref(false)
 
 const loadAll = async () => {
   isLoading.value = true
@@ -47,9 +48,47 @@ const loadAll = async () => {
     world.value = wRes.data
     entries.value = eRes as WorldEntry[]
     boundArticles.value = aRes
+    recordWorldHistory()
+    checkFavoriteStatus()
     loadRelations()
   } catch { /* */ }
   finally { isLoading.value = false }
+}
+
+function recordWorldHistory() {
+  if (!world.value || !userStore.userInfo?.id) return
+  if (world.value.userId === userStore.userInfo.id) return
+  if (!world.value.isPublic) return
+  try {
+    const key = `browseHistory_${userStore.userInfo.id}`
+    const stored = localStorage.getItem(key)
+    const history = stored ? JSON.parse(stored) : []
+    const filtered = history.filter((h: any) => !(h.entityType === 'WORLD' && h.entityId === world.value!.id))
+    filtered.unshift({
+      entityId: world.value.id,
+      entityTitle: world.value.name,
+      entityType: 'WORLD',
+      authorId: world.value.userId,
+      viewedAt: new Date().toISOString(),
+    })
+    localStorage.setItem(key, JSON.stringify(filtered.slice(0, 50)))
+  } catch { /* */ }
+}
+
+async function checkFavoriteStatus() {
+  if (!userStore.isLogin()) return
+  try {
+    const res = await http.get(`/worlds/${worldId}/favorite/status`)
+    isFavorited.value = res.data?.favorited ?? (res.data as any) ?? false
+  } catch { /* */ }
+}
+
+async function toggleFavorite() {
+  if (!userStore.isLogin()) { alert('请先登录'); return }
+  try {
+    await http.post(`/worlds/${worldId}/favorite`)
+    isFavorited.value = !isFavorited.value
+  } catch (e: any) { alert(e.message || '操作失败') }
 }
 
 const loadRelations = async () => {
@@ -148,6 +187,14 @@ onMounted(() => { loadAll(); loadComments() })
           </div>
           <div class="header-actions">
             <button
+              v-if="userStore.isLogin()"
+              class="btn-fav"
+              :class="{ favorited: isFavorited }"
+              @click="toggleFavorite"
+            >
+              {{ isFavorited ? '⭐ 已收藏' : '☆ 收藏' }}
+            </button>
+            <button
               v-if="userStore.isLogin() && !isOwner && !isCollab"
               class="btn-join"
               @click="showJoinModal = true"
@@ -166,6 +213,7 @@ onMounted(() => { loadAll(); loadComments() })
         <p v-if="world.description" class="world-desc">{{ world.description }}</p>
         <div class="world-meta">
           <span>创建于 {{ formatDate(world.createdAt) }}</span>
+          <span v-if="world.userId" class="world-owner-link" @click="router.push(`/profile/${world.userId}`)">👤 作者主页</span>
           <span v-if="isOwner" class="owner-tag">你拥有这个世界</span>
           <span v-if="isCollab" class="collab-tag">你是共创者</span>
         </div>
@@ -301,12 +349,17 @@ onMounted(() => { loadAll(); loadComments() })
 .world-desc { font-size: 14px; color: #5f6368; line-height: 1.6; margin: 16px 0; }
 .world-meta { display: flex; gap: 16px; font-size: 13px; color: #999; }
 .owner-tag { color: #1a73e8; font-weight: 500; }
+.world-owner-link { color: #1a73e8; cursor: pointer; font-weight: 500; transition: color 0.15s; }
+.world-owner-link:hover { text-decoration: underline; }
 .collab-tag { color: #137333; font-weight: 500; }
 
 .btn-join { padding: 10px 22px; background: #1a73e8; color: #fff; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; }
 .btn-join:hover { background: #1557b0; }
 .btn-manage { padding: 10px 22px; background: #fff; color: #1a73e8; border: 1px solid #1a73e8; border-radius: 8px; cursor: pointer; font-size: 14px; }
 .btn-manage:hover { background: #e8f0fe; }
+.btn-fav { padding: 10px 18px; background: #fff; color: #f59e0b; border: 1px solid #f59e0b; border-radius: 8px; cursor: pointer; font-size: 14px; }
+.btn-fav:hover { background: #fffbeb; }
+.btn-fav.favorited { background: #f59e0b; color: #fff; }
 
 /* Requests panel */
 .requests-panel { background: #fff; border-radius: 14px; padding: 24px; box-shadow: 0 1px 4px rgba(0,0,0,0.05); border: 1px solid #f1f3f4; margin-bottom: 24px; }

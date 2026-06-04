@@ -60,11 +60,32 @@ const loadChain = async () => {
   try {
     const res = await http.get<ChainDetailFull>(`/chains/public/${chainId}`)
     chain.value = res.data
+    recordChainHistory()
   } catch (e: any) {
     console.error('加载接龙失败', e)
   } finally {
     isLoading.value = false
   }
+}
+
+function recordChainHistory() {
+  if (!chain.value || !userStore.userInfo?.id) return
+  if (chain.value.creatorId === userStore.userInfo.id) return
+  try {
+    const key = `browseHistory_${userStore.userInfo.id}`
+    const stored = localStorage.getItem(key)
+    const history = stored ? JSON.parse(stored) : []
+    const filtered = history.filter((h: any) => !(h.entityType === 'CHAIN' && h.entityId === chain.value!.id))
+    filtered.unshift({
+      entityId: chain.value.id,
+      entityTitle: chain.value.title,
+      entityType: 'CHAIN',
+      authorName: chain.value.creatorName,
+      authorId: chain.value.creatorId,
+      viewedAt: new Date().toISOString(),
+    })
+    localStorage.setItem(key, JSON.stringify(filtered.slice(0, 50)))
+  } catch { /* */ }
 }
 
 const handleJoin = async () => {
@@ -178,7 +199,7 @@ onMounted(loadChain)
             <h1 class="chain-title">{{ chain.title }}</h1>
             <div class="chain-initiator">
               <span class="initiator-label">发起人</span>
-              <span class="initiator-name">👤 {{ chain.creatorName || '匿名' }}</span>
+              <span class="initiator-name" @click="router.push(`/profile/${chain.creatorId}`)">👤 {{ chain.creatorName || '匿名' }}</span>
               <span class="chain-created">{{ formatDateTime(chain.createdAt) }}</span>
             </div>
           </div>
@@ -221,7 +242,7 @@ onMounted(loadChain)
           <div class="segment-body">
             <div class="segment-top">
               <span class="seg-index">第 {{ index + 1 }} 段</span>
-              <span class="seg-author">👤 {{ seg.username || '匿名' }}</span>
+              <span class="seg-author" @click="router.push(`/profile/${seg.userId}`)">👤 {{ seg.username || '匿名' }}</span>
               <span v-if="seg.isAiGenerated" class="ai-badge">🤖 AI续写</span>
               <span
                 v-if="seg.status === 'PENDING'"
@@ -357,7 +378,8 @@ onMounted(loadChain)
 .chain-title { font-size: 24px; font-weight: 700; color: #202124; margin: 0 0 12px 0; }
 .chain-initiator { display: flex; align-items: center; gap: 12px; font-size: 14px; color: #5f6368; }
 .initiator-label { color: #999; }
-.initiator-name { font-weight: 500; color: #333; }
+.initiator-name { font-weight: 500; color: #333; cursor: pointer; transition: color 0.15s; }
+.initiator-name:hover { color: #1a73e8; text-decoration: underline; }
 .chain-created { color: #999; }
 .chain-description { font-size: 14px; color: #5f6368; line-height: 1.6; margin: 16px 0 0; }
 .chain-meta-row { display: flex; gap: 16px; margin-top: 16px; padding-top: 14px; border-top: 1px solid #f1f3f4; }
@@ -398,7 +420,8 @@ onMounted(loadChain)
   flex-wrap: wrap;
 }
 .seg-index { font-weight: 600; color: #1a73e8; }
-.seg-author { color: #333; font-weight: 500; }
+.seg-author { color: #333; font-weight: 500; cursor: pointer; transition: color 0.15s; }
+.seg-author:hover { color: #1a73e8; text-decoration: underline; }
 .ai-badge { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #fff; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
 .seg-time { color: #999; }
 .seg-status { font-size: 11px; padding: 2px 8px; border-radius: 4px; }

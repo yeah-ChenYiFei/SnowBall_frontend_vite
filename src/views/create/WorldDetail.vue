@@ -213,12 +213,23 @@ function selectTypeFilter(t: string) { selectedType.value = selectedType.value =
 
 function openEntryModal() {
   entryForm.value = { name: '', type: '', content: '' }; showNewEntryType.value = false
-  newEntryType.value = ''; showEntryModal.value = true
+  newEntryType.value = ''; entryMsg.value = ''; showEntryModal.value = true
+}
+
+const entryMsg = ref('')
+const canCreateEntry = computed(() =>
+  entryForm.value.name.trim() && entryForm.value.type && entryForm.value.content.trim()
+)
+
+function handleCreateEntry() {
+  if (!entryForm.value.name.trim()) { entryMsg.value = '名称不能为空'; return }
+  if (!entryForm.value.type) { entryMsg.value = '类型不能为空'; return }
+  if (!entryForm.value.content.trim()) { entryMsg.value = '内容不能为空'; return }
+  entryMsg.value = ''
+  createEntry()
 }
 
 async function createEntry() {
-  if (!entryForm.value.name.trim() || !entryForm.value.content.trim()) { message.value = '名称和内容不能为空'; return }
-  if (!entryForm.value.type) { message.value = '请选择类型'; return }
   entrySubmitting.value = true
   try {
     await http.post(`/worlds/${worldId}/entries`, entryForm.value)
@@ -671,9 +682,10 @@ onMounted(() => {
               </div>
             </div>
             <div class="form-row"><label>内容</label><textarea v-model="entryForm.content" class="form-input form-textarea" rows="10" placeholder="详细描述..."></textarea></div>
+            <div v-if="entryMsg" class="entry-msg">{{ entryMsg }}</div>
             <div class="modal-actions">
               <button class="btn-cancel" @click="showEntryModal = false">取消</button>
-              <button class="wd-btn-primary" @click="createEntry" :disabled="entrySubmitting">{{ entrySubmitting ? '创建中...' : '创建' }}</button>
+              <button class="wd-btn-primary" @click="handleCreateEntry" :disabled="entrySubmitting || !canCreateEntry">{{ entrySubmitting ? '创建中...' : '创建' }}</button>
             </div>
           </div>
         </div>
@@ -1054,6 +1066,7 @@ onMounted(() => {
 .form-textarea { resize: vertical; }
 .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
 .modal-actions-right { display: flex; gap: 10px; margin-left: auto; }
+.entry-msg { padding: 6px 10px; background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; border-radius: 6px; font-size: 12px; margin-top: 8px; }
 
 /* Relation modals */
 .rel-list { display: flex; flex-direction: column; gap: 6px; }
